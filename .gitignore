@@ -1,0 +1,61 @@
+# --- Go build artifacts ---
+bin/
+pkg/
+*.test
+*.out
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.a
+*.o
+*.obj
+*.swp
+go.work
+go.work.sum
+cover.*
+
+# --- Node.js / JavaScript ---
+node_modules/
+dist/
+build/
+.npm/
+.pnpm-store/
+.yarn/
+.turbo/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Environment & secrets ---
+.env
+.env.*
+
+# --- IDEs & editors ---
+.idea/
+*.iml
+.fleet/
+.vscode/
+.history/
+
+# --- OS-generated files ---
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.Trash-*
+
+# --- Misc build caches ---
+.cache/
+.coverage/
+coverage/
+tmp/
+temp/
