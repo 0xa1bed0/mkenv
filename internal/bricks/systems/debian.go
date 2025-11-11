@@ -1,71 +1,50 @@
 package systems
 
-import (
-	"github.com/0xa1bed0/mkenv/internal/bricks/systems/shells"
-)
+import "github.com/0xa1bed0/mkenv/internal/dockerfile"
 
-type debian struct {
-	SystemBase
-}
+const debian = "system/debian"
 
-// GetDockerfilePatch implements container.Brick.
-func (d *debian) GetDockerfilePatch() (string, error) {
-	patch := `FROM debian:bookworm-slim
-SHELL ["/bin/bash", "-lc"]
+func NewDebian(metadata map[string]string) (dockerfile.Brick, error) {
+	if metadata == nil {
+		metadata = make(map[string]string)
+	}
+	base, baseExists := metadata["base"]
+	if !baseExists || base == "" {
+		base = "debian:bookworm-slim"
+	}
 
-ARG DEBIAN_FRONTEND=noninteractive
+	workdir, workdirExists := metadata["workdir"]
+	if !workdirExists || workdir == "" {
+		workdir = "/workspace"
+	}
 
-ARG USER_NAME=dev
-ARG USER_UID=1000
-ARG USER_GID=1000
+	brick, err := dockerfile.NewBrick(debian, "Debian OS", 
+		dockerfile.WithKind(dockerfile.BrickKindSystem),
+		dockerfile.WithBaseImage(base),
+		dockerfile.WithWorkdir(workdir),
+		dockerfile.WithPackageManager(&AptManager{}),
+		// TODO: move this to platform
+		dockerfile.WithRootRun(dockerfile.Command{ When: "build", Argv: []string{ "groupadd", "--gid", "${MKENV_GID}", "${MKENV_USERNAME}" }}),
+		dockerfile.WithRootRun(dockerfile.Command{ When: "build", Argv: []string{ "useradd", "--uid", "${MKENV_UID}", "--gid", "${MKENV_GID}", "-m", "${MKENV_USERNAME}"  }}),
+		dockerfile.WithRootRun(dockerfile.Command{ When: "build", Argv: []string{ "mkdir", "-p", workdir}}),
+		dockerfile.WithRootRun(dockerfile.Command{ When: "build", Argv: []string{ "chown", "-R", "${MKENV_USERNAME}:${MKENV_USERNAME}", workdir}}),
+		dockerfile.WithRootRun(dockerfile.Command{ When: "build", Argv: []string{ "mkdir", "-p", "${MKENV_LOCAL_BIN}"}}),
+		dockerfile.WithRootRun(dockerfile.Command{ When: "build", Argv: []string{ "chown", "-R", "${MKENV_USERNAME}:${MKENV_USERNAME}", "${MKENV_LOCAL_BIN}"}}),
+		dockerfile.WithFileTemplate(dockerfile.FileTemplate{
+			ID: "system config",
+			FilePath: "rc",
+			Content: `export MKENV_LOCAL_BIN="${MKENV_LOCAL_BIN}"
+export PATH="$PATH:$MKENV_LOCAL_BIN"`,
+		}),
+  )
 
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends \
-	ca-certificates \
-	curl \
-	git \
-	less \
-	build-essential \
-	pkg-config \
-	cmake \
-	&& rm -rf /var/lib/apt/lists/*
-
-RUN groupadd --gid ${USER_GID} ${USER_NAME} \
-	&& useradd --uid ${USER_UID} --gid ${USER_GID} -m ${USER_NAME}
-
-USER ${USER_NAME}
-RUN mkdir /workspace
-WORKDIR /workspace
-`
-
-	shellConf, err := d.shell.GetDockerfilePatch()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	patch += shellConf
-
-	patch += `
-USER ${USER_NAME}
-ENV HOME=/home/${USER_NAME}
-`
-
-	return patch, nil
+	return brick, nil
 }
 
-// NewSystemDebian creates a Debian-based system brick configured with the
-// default (zsh) shell
-func NewSystemDebian() System {
-	return NewSystemDebianWithShell(shells.NewShellZSH())
-}
-
-// NewSystemDebianWithShell creates a Debian-based system brick configured with the
-// provided shell.
-func NewSystemDebianWithShell(shell shells.Shell) System {
-	d := &debian{ }
-	if shell != nil {
-		d.SetShell(shell)
-	}
-
-	return d
+func init() {
+	dockerfile.RegisterBrick(debian, NewDebian)
 }

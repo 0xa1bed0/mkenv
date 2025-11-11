@@ -1,0 +1,74 @@
+name: Run tests
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: ['*']
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    strategy:
+      matrix:
+        go-version: [1.24.x, 1.25.x] # oldest version that can build go mock and official supported go versions
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+        cache-dependency-path: '**/go.sum'
+
+    - name: Vet and build
+      run: |
+        go vet ./...
+        go build ./...
+
+    - name: Install mockgen
+      run: |
+        go install go.uber.org/mock/mockgen
+
+    - name: Run test script
+      run: |
+        ./ci/test.sh
+        ./ci/check_panic_handling.sh
+
+    - name: Run Go Tests
+      run: |
+        for i in $(find $PWD -name go.mod ! -path "$PWD/bazel/go.mod"); do
+          pushd $(dirname $i)
+          go test ./...
+          popd
+        done 
+
+  bazel:
+    strategy:
+      matrix:
+        os:
+          - macos
+          - ubuntu
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bazel
+        uses: bazel-contrib/setup-bazel@0.10.0
+        with:
+          # Avoid downloading Bazel every time.
+          bazelisk-cache: true
+          # Store build cache per workflow.
+          disk-cache: ${{ github.workflow }}
+          # Share repository cache between workflows.
+          repository-cache: true
+
+      - name: Run Bazel tests
+        run: |
+          cd bazel && bazel test //...

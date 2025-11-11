@@ -1,0 +1,4 @@
+./ohmyzsh.go
+./shells.go
+./zsh.go
+./zsh_test.go

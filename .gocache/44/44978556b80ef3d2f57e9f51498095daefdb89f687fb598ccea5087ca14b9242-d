@@ -1,0 +1,6 @@
+# test log
+getenv PWD
+stat .
+open .
+stat fsops.go
+open mocks

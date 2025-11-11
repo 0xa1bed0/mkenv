@@ -20,6 +20,11 @@ type FileManager interface {
 	// Provide ignorePaths to skip specific subdirectories.
 	FindFile(filename string, ignorePaths []string) ([]string, error)
 
+	// HasFilesWithExtensions reports whether there is at least one file whose
+	// extension is in extsCSV (comma-separated, items like "go, ts, .tsx").
+	// It respects ignorePaths the same way FindFile does.
+	HasFilesWithExtensions(extsCSV string, ignorePaths []string) (bool, error)
+
 	// GetFileScanner provides FileScanner for an existing file in the directory.
 	GetFileScanner(filepath string, bufSize uint8) (FileScanner, error)
 }
@@ -31,8 +36,8 @@ type folderPtr struct {
 
 // GetFileScanner implements FileManager.
 func (ptr *folderPtr) GetFileScanner(filepath string, bufSize uint8) (FileScanner, error) {
-	// TODO: check if file is in root and check if there is no .. 
-	return newFileScanner(ptr.root + "/" + filepath, bufSize)
+	// TODO: check if file is in root and check if there is no ..
+	return newFileScanner(ptr.root+"/"+filepath, bufSize)
 }
 
 // NewFileManager builds a FileManager rooted at dir using the default OS
@@ -70,6 +75,95 @@ func NewFileManagerWithOps(dir string, ops fsops.Ops) (FileManager, error) {
 		root: ops.Path.Clean(abs),
 		ops:  ops,
 	}, nil
+}
+
+func (p *folderPtr) HasFilesWithExtensions(extsCSV string, ignorePaths []string) (bool, error) {
+	exts, err := parseExtsCSV(extsCSV)
+	if err != nil {
+		return false, err
+	}
+	if len(exts) == 0 {
+		return false, nil
+	}
+
+	// Normalize ignore list (same logic as in FindFile)
+	ignoreAbs := make([]string, 0, len(ignorePaths))
+	for _, q := range ignorePaths {
+		if q == "" {
+			continue
+		}
+		var abs string
+		if p.ops.Path.IsAbs(q) {
+			rel, err := p.ops.Path.Rel(p.root, q)
+			if err != nil || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
+				continue // outside root
+			}
+			abs = p.ops.Path.Join(p.root, rel)
+		} else {
+			abs = p.ops.Path.Join(p.root, q)
+		}
+		ignoreAbs = append(ignoreAbs, p.ops.Path.Clean(abs))
+	}
+	shouldSkip := func(absPath string, isDir bool) (skipNode, skipTree bool) {
+		for _, ig := range ignoreAbs {
+			if samePath(absPath, ig) {
+				if isDir {
+					return true, true
+				}
+				return true, false
+			}
+		}
+		return false, false
+	}
+
+	found := false
+	sentinel := errors.New("found") // used to break WalkDir early
+
+	walkFn := func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		abs := p.ops.Path.Clean(path)
+
+		if skipNode, skipTree := shouldSkip(abs, d.IsDir()); skipNode {
+			if skipTree {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		ext := strings.ToLower(p.ops.Path.Ext(d.Name()))
+		if _, ok := exts[ext]; ok {
+			found = true
+			return sentinel // stop walking early
+		}
+		return nil
+	}
+
+	if err := p.ops.Walker.WalkDir(p.root, walkFn); err != nil && !errors.Is(err, sentinel) {
+		return false, err
+	}
+	return found, nil
+}
+
+// parseExtsCSV turns "go, ts, .tsx" into map{".go":{}, ".ts":{}, ".tsx":{}}
+func parseExtsCSV(csv string) (map[string]struct{}, error) {
+	out := make(map[string]struct{})
+	for _, raw := range strings.Split(csv, ",") {
+		s := strings.TrimSpace(raw)
+		if s == "" {
+			continue
+		}
+		if !strings.HasPrefix(s, ".") {
+			s = "." + s
+		}
+		s = strings.ToLower(s)
+		out[s] = struct{}{}
+	}
+	return out, nil
 }
 
 func (ptr *folderPtr) FindFile(filename string, ignorePaths []string) ([]string, error) {

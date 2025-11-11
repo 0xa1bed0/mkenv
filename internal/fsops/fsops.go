@@ -15,6 +15,7 @@ type PathOps interface {
 	Join(elem ...string) string
 	Clean(path string) string
 	IsAbs(path string) bool
+	Ext(name string) string
 }
 
 // OSOps abstracts filesystem metadata queries such as os.Stat.
@@ -52,6 +53,7 @@ func (stdPathOps) Rel(basepath, targpath string) (string, error) {
 func (stdPathOps) Join(elem ...string) string { return filepath.Join(elem...) }
 func (stdPathOps) Clean(path string) string   { return filepath.Clean(path) }
 func (stdPathOps) IsAbs(path string) bool     { return filepath.IsAbs(path) }
+func (stdPathOps) Ext(name string) string     { return filepath.Ext(name) }
 
 type stdOSOps struct{}
 
