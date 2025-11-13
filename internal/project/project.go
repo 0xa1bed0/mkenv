@@ -1,6 +1,7 @@
 package project
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,11 +18,13 @@ type Project struct {
 	ImageID string
 }
 
-func ResolveProject(path string, imgTag string) *Project {
+func ResolveProject(givenPath string) *Project {
+	path := resolveProjectPath(givenPath)
+
 	return &Project{
 		Name: projectNameFromPath(path),
 		Path: path,
-		ImageID: imgTag,
+		ImageID: "", // resolve from projects.json - this can be also used to list projects
 	}
 }
 
@@ -66,3 +69,32 @@ func projectNameFromPath(input string) string {
 	return name
 }
 
+func resolveProjectPath(input string) string {
+	// Normalize to absolute path
+	abs, err := filepath.Abs(input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: invalid path: %v\n", err)
+		os.Exit(1)
+	}
+	pathExists, err := pathExists(abs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	if !pathExists {
+		fmt.Fprintf(os.Stderr, "Error: path %s does not exists\n", abs)
+		os.Exit(1)
+	}
+	return abs
+}
+
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil // exists (file or dir)
+	}
+	if os.IsNotExist(err) {
+		return false, nil // does not exist
+	}
+	return false, err // some other error (e.g. permission denied)
+}

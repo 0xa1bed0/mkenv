@@ -31,6 +31,7 @@ type CacheManager interface {
 		imageExists func(context.Context, ImageID) bool,
 		buildDockerfile func(ctx context.Context) (dockerFile dockerfile.Dockerfile, err error),
 		buildImageSync func(ctx context.Context, dockerFile dockerfile.Dockerfile, tag string) (ImageID, error),
+		forceBuild bool,
 	) (ImageID, error)
 }
 
@@ -65,6 +66,7 @@ func (c *Cache) ResolveImage(
 	imageExists func(context.Context, ImageID) bool,
 	buildDockerfile func(ctx context.Context) (dockerFile dockerfile.Dockerfile, err error),
 	buildImageSync func(ctx context.Context, dockerFile dockerfile.Dockerfile, tag string) (ImageID, error),
+	forceBuild bool,
 ) (ImageID, error) {
 	if imageExists == nil || buildImageSync == nil || buildDockerfile == nil {
 		return "", errors.New("helpers imageExists, buildImage, and buildDockerfile is mandatory for image resolving")
@@ -105,7 +107,7 @@ func (c *Cache) ResolveImage(
 			state = newReadonlyEmptyCacheState()
 		}
 
-		if id, ok := state.getImageIDByUserPreferenceKey(userPreferenceKey); ok {
+		if id, ok := state.getImageIDByUserPreferenceKey(userPreferenceKey); !forceBuild && ok {
 			if isBuilding(id) {
 				// the image is building by another process. lets wait a little bit and try again.
 				c.mu.Unlock()
@@ -144,7 +146,7 @@ func (c *Cache) ResolveImage(
 		dockerfileKey := CacheKeyDockerfileLines(dockerFile)
 
 		// TODO: fix CacheKey string casting
-		if id, ok := state.getImageIDByDockerfileKey(dockerfileKey); ok {
+		if id, ok := state.getImageIDByDockerfileKey(dockerfileKey); !forceBuild && ok {
 			_ = state.setUserPreferenceKey(userPreferenceKey, id)
 			if isBuilding(id) {
 				// the image is building by another process. lets wait a little bit and try again.

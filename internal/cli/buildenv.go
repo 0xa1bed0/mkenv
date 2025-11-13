@@ -25,8 +25,8 @@ func NewDockerImageBuildOrchestrator(dockerClient dockerclient.DockerClient, cac
 	}
 }
 
-func (orc *DockerImageBuildOrchestrator) ResolveImageTag(ctx context.Context, projectPath string, userPrefs *dockerfile.UserPreferences) (string, error) {
-	imgID, err := orc.cacheManager.ResolveImage(ctx, projectPath, userPrefs, orc.imageExists, orc.buildDockerfile, orc.buildImageSync)
+func (orc *DockerImageBuildOrchestrator) ResolveImageTag(ctx context.Context, projectPath string, userPrefs *dockerfile.UserPreferences, forceBuild bool) (string, error) {
+	imgID, err := orc.cacheManager.ResolveImage(ctx, projectPath, userPrefs, orc.imageExists, orc.buildDockerfile, orc.buildImageSync, forceBuild)
 	if err != nil {
 		return "", err
 	}

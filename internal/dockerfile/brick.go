@@ -17,7 +17,6 @@ type Brick interface {
 	Kinds() BrickKindsSet
 
 	BaseImage() string
-	Workdir() string
 	PackageRequests() []PackageRequest
 	Envs() map[string]string
 	RootRun() []Command
@@ -81,13 +80,11 @@ type brick struct {
 
 	cacheFolders CacheFoldersPaths
 
-	workdir    string
 	entrypoint []string
 	cmd        []string
 }
 
 func (b *brick) BaseImage() string       { return b.baseImage }
-func (b *brick) Workdir() string         { return b.workdir }
 func (b *brick) Envs() map[string]string { return copyMap(b.envs) }
 func (b *brick) RootRun() []Command      { return copyCommands(b.rootRun) }
 func (b *brick) UserRun() []Command      { return copyCommands(b.userRun) }

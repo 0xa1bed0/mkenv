@@ -26,7 +26,6 @@ type BuildPlan struct {
 	args   map[string]string
 
 	baseImage string
-	workdir   string
 
 	packages []PackageSpec
 	envs     map[string]string
@@ -201,7 +200,6 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 	}
 
 	plan.baseImage = p.systemBrick.BaseImage()
-	plan.workdir = p.systemBrick.Workdir()
 
 	plan.processBrick(p.systemBrick)
 

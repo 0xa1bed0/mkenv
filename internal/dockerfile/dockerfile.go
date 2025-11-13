@@ -41,11 +41,9 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 	}
 
 	// Buildtime tmp workdir for root steps
-	if plan.workdir != "" {
-		lines = append(lines, "", "# ───────────────────────────────────────────")
-		lines = append(lines, "# TMP BUILD TIME WORKDIR (root scope)")
-		lines = append(lines, "WORKDIR /tmp/build/root")
-	}
+	lines = append(lines, "", "# ───────────────────────────────────────────")
+	lines = append(lines, "# TMP BUILD TIME WORKDIR (root scope)")
+	lines = append(lines, "WORKDIR /tmp/build/root")
 
 	// Root steps (exec-form RUN)
 	if len(plan.rootRun) > 0 {
@@ -68,11 +66,9 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 	lines = append(lines, fmt.Sprintf("USER %s", plan.args["MKENV_USERNAME"]))
 
 	// Buildtime tmp workdir for user steps
-	if plan.workdir != "" {
-		lines = append(lines, "", "# ───────────────────────────────────────────")
-		lines = append(lines, "# TMP BUILD TIME WORKDIR (User scope)")
-		lines = append(lines, "WORKDIR /tmp/build/user")
-	}
+	lines = append(lines, "", "# ───────────────────────────────────────────")
+	lines = append(lines, "# TMP BUILD TIME WORKDIR (User scope)")
+	lines = append(lines, "WORKDIR /tmp/build/user")
 
 	// User-level steps
 	if len(plan.userRun) > 0 {
@@ -99,12 +95,9 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 		}
 	}
 
-	// Workdir
-	if plan.workdir != "" {
-		lines = append(lines, "", "# ───────────────────────────────────────────")
-		lines = append(lines, "# WORKDIR")
-		lines = append(lines, fmt.Sprintf("WORKDIR %s", replaceVars(plan.workdir, plan.args)))
-	}
+	lines = append(lines, "", "# ───────────────────────────────────────────")
+	lines = append(lines, "# WORKDIR")
+	lines = append(lines, fmt.Sprintf("WORKDIR %s", "/workdir"))
 
 	cacheFoldersPaths := []string{}
 	for _, cp := range plan.cachePaths {

@@ -176,14 +176,6 @@ func WithFileTemplates(fileTemplates []FileTemplate) BrickOption {
 	}
 }
 
-func WithWorkdir(workdir string) BrickOption {
-	return func(bi *brick) error {
-		bi.workdir = workdir
-
-		return nil
-	}
-}
-
 func WithEntrypoint(entrypoint []string) BrickOption {
 	return func(bi *brick) error {
 		if len(bi.entrypoint) > 0 {
@@ -225,7 +217,6 @@ func WithBrick(b Brick) BrickOption {
 		WithRootRuns(b.RootRun())(bi)
 		WithUserRuns(b.UserRun())(bi)
 		WithFileTemplates(b.FileTemplates())(bi)
-		WithWorkdir(b.Workdir())(bi)
 		WithEntrypoint(b.Entrypoint())(bi)
 		WithCmd(b.Cmd())(bi)
 		WithCacheFolders(b.CacheFolders())(bi)
