@@ -1,4 +1,0 @@
-./defs_linux.go
-./defs_linux_arm64.go
-./syscall_linux.go
-./asm_linux_arm64.s

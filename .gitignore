@@ -59,3 +59,7 @@ $RECYCLE.BIN/
 coverage/
 tmp/
 temp/
+
+.nvimlog
+.gocache 
+.gomod
