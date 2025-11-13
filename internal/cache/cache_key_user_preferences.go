@@ -39,7 +39,7 @@ func CacheKeyUserPreferences(projectAbsPath string, in *dockerfile.UserPreferenc
 }
 
 func normalizePrefs(p dockerfile.UserPreferences) dockerfile.UserPreferences {
-	out := p // shallow copy
+	out := p // this is intentional 
 
 	out.EnableBricks = cloneAndSortBricks(p.EnableBricks)
 	out.DisableBricks = cloneAndSortBricks(p.DisableBricks)

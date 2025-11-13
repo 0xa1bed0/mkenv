@@ -11,6 +11,7 @@ import (
 	"github.com/0xa1bed0/mkenv/internal/cache"
 	"github.com/0xa1bed0/mkenv/internal/cli"
 	"github.com/0xa1bed0/mkenv/internal/dockerclient"
+	"github.com/0xa1bed0/mkenv/internal/project"
 	_ "github.com/0xa1bed0/mkenv/internal/registry" // blank import triggers init() in internal/bricks/...
 
 	"github.com/0xa1bed0/mkenv/internal/dockerfile"
@@ -117,17 +118,22 @@ func main() {
 
 	orchestrator := cli.NewDockerImageBuildOrchestrator(dockerClient, cacheManager, planner)
 
-	tag, err := orchestrator.ResolveImageTag(ctx, cfg.Path, userPrefs)
+	imageTag, err := orchestrator.ResolveImageTag(ctx, cfg.Path, userPrefs)
+
+	binds := []string{}
+	// TODO: figure how to get MKENV_HOME here so we know where to mount these in advance
+	binds = append(binds, "/Users/anatolii/projects/albedo/nvim:/home/dev/.config/nvim")
+	binds = append(binds, "/Users/anatolii/projects/albedo/tmux.conf:/home/dev/.tmux.conf")
+	// TODO: since we can't get var substitution here (replace ${MKENV_WORKDIR}) - lets make single and constant workdir across all envs
+	binds = append(binds, cfg.Path+":/home/dev/workspace")
+
 	if err != nil {
 		panic(err)
 	}
 
 	bgCtx := context.Background()
-	exitCode, err := dockerClient.RunContainer(bgCtx, tag, []string{
-		"/Users/anatolii/projects/albedo/nvim:/home/dev/.config/nvim",
-		"/Users/anatolii/projects/albedo/tmux.conf:/home/dev/.tmux.conf",
-		cfg.Path+":/home/dev/workspace",
-	})
+	project := project.ResolveProject(cfg.Path, imageTag)
+	exitCode, err := dockerClient.RunContainer(bgCtx, project, binds)
 	if err != nil {
 		panic(err)
 	}

@@ -106,6 +106,13 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 		lines = append(lines, fmt.Sprintf("WORKDIR %s", replaceVars(plan.workdir, plan.args)))
 	}
 
+	cacheFoldersPaths := []string{}
+	for _, cp := range plan.cachePaths {
+		path := replaceVars(cp, plan.args)
+		cacheFoldersPaths = append(cacheFoldersPaths, path)
+		lines = append(lines, `RUN ["mkdir", "-p", "`+path+`"]`)
+	}
+
 	// Entrypoint/Cmd
 	if len(plan.entrypoint) > 0 {
 		lines = append(lines, "", "# ───────────────────────────────────────────")
@@ -123,6 +130,10 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 		lines = append(lines, "", "# ───────────────────────────────────────────")
 		lines = append(lines, "# AUDIT LABELS")
 		lines = append(lines, fmt.Sprintf("LABEL mkenv.bricks=\"%s\"", strings.Join(uniq, ",")))
+	}
+
+	if len(cacheFoldersPaths) > 0 {
+		lines = append(lines, fmt.Sprintf("LABEL mkenv_cache_volumes=\"%s\"", strings.Join(cacheFoldersPaths, ",")))
 	}
 
 	return lines

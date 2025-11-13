@@ -11,18 +11,16 @@ import (
 	"github.com/0xa1bed0/mkenv/internal/dockerfile"
 )
 
-type DockerImageBuildOrchestrator struct { 
+type DockerImageBuildOrchestrator struct {
 	cacheManager cache.CacheManager
-	planner dockerfile.Planner
+	planner      dockerfile.Planner
 	dockerClient dockerclient.DockerClient
-	projectPath string
-	userPrefs *dockerfile.UserPreferences
 }
 
 func NewDockerImageBuildOrchestrator(dockerClient dockerclient.DockerClient, cacheManager cache.CacheManager, planner dockerfile.Planner) *DockerImageBuildOrchestrator {
 	return &DockerImageBuildOrchestrator{
 		cacheManager: cacheManager,
-		planner: planner,
+		planner:      planner,
 		dockerClient: dockerClient,
 	}
 }
@@ -97,6 +95,7 @@ func (orc *DockerImageBuildOrchestrator) buildDockerfile(ctx context.Context) (d
 				return nil, res.Err
 			}
 			df := res.BuildPlan.GenerateDockerfile()
+
 			return df, nil
 
 		case <-ctx.Done():
@@ -106,13 +105,12 @@ func (orc *DockerImageBuildOrchestrator) buildDockerfile(ctx context.Context) (d
 	}
 }
 
-func (orc *DockerImageBuildOrchestrator) buildImageSync(ctx context.Context, dockerFile dockerfile.Dockerfile) (cache.ImageID, error) {
-	// TODO: make tag more meaningful
-	tag, err := orc.dockerClient.BuildImage(ctx, dockerFile.String(), "mkenv_bin")
+func (orc *DockerImageBuildOrchestrator) buildImageSync(ctx context.Context, dockerFile dockerfile.Dockerfile, tag string) (cache.ImageID, error) {
+	// TODO: make "mkenv:" in docker tag configurable
+	tag, err := orc.dockerClient.BuildImage(ctx, dockerFile.String(), "mkenv:" + tag)
 	if err != nil {
 		return "", err
 	}
 
 	return cache.ImageID(tag), nil
 }
-

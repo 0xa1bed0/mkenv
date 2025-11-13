@@ -38,10 +38,12 @@ type BuildPlan struct {
 	entrypoint []string
 	cmd        []string
 
+	cachePaths []string
+
 	order []BrickID // for audit
 }
 
-func (plan *BuildPlan) applyBrick(brick Brick) {
+func (plan *BuildPlan) processBrick(brick Brick) CacheFoldersPaths {
 	for _, packageRequest := range brick.PackageRequests() {
 		for _, packageSpec := range packageRequest.Packages {
 			plan.packages = append(plan.packages, packageSpec.Clone())
@@ -52,6 +54,9 @@ func (plan *BuildPlan) applyBrick(brick Brick) {
 	plan.userRun = append(plan.userRun, brick.UserRun()...)
 	plan.fileTemplates = append(plan.fileTemplates, brick.FileTemplates()...)
 	plan.order = append(plan.order, brick.ID())
+	plan.cachePaths = append(plan.cachePaths, brick.CacheFolders()...)
+
+	return CacheFoldersPaths{}
 }
 
 type PlanResult struct {
@@ -183,6 +188,7 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 		fileTemplates: []FileTemplate{},
 		entrypoint:    []string{},
 		cmd:           []string{},
+		cachePaths: []string{},
 		// TODO: let bricks configure it and make sure system args is not overriden by bricks
 		args: map[string]string{
 			"MKENV_USERNAME":  "dev",
@@ -197,7 +203,7 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 	plan.baseImage = p.systemBrick.BaseImage()
 	plan.workdir = p.systemBrick.Workdir()
 
-	plan.applyBrick(p.systemBrick)
+	plan.processBrick(p.systemBrick)
 
 	if p.entrypointBrick != nil {
 		plan.entrypoint = p.entrypointBrick.Entrypoint()
@@ -226,7 +232,7 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 			// TODO: implement option to stop and wait for confirmation
 			p.userPrompts <- &Warning{Msg: "common brick " + string(brick.ID()) + " tries to execute root commands: \n\n" + strings.Join(commands, "\n")}
 		}
-		plan.applyBrick(brick)
+		plan.processBrick(brick)
 	}
 
 	plan.expandPackages()
@@ -236,7 +242,7 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 
 func (p *planner) processEntrypointCandidates(ctx context.Context) error {
 	if p.systemBrick == nil {
-		return errors.New("Please choose system brick first")
+		return errors.New("please choose system brick first")
 	}
 
 	if p.systemBrick.Kinds().Contains(BrickKindEntrypoint) {

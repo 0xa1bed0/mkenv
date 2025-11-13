@@ -9,17 +9,17 @@ type BrickOption func(*brick) error
 func NewBrick(id BrickID, description string, opts ...BrickOption) (Brick, error) {
 	brick := &brick{
 		BrickInfo: BrickInfo{
-			id: id,
+			id:          id,
 			description: description,
-			kinds: NewBrickKindsSet(),
+			kinds:       NewBrickKindsSet(),
 		},
 		packageRequests: []PackageRequest{},
-		envs: map[string]string{},
-		rootRun: []Command{},
-		userRun: []Command{},
-		fileTemplates: []FileTemplate{},
-		entrypoint: []string{},
-		cmd: []string{},
+		envs:            map[string]string{},
+		rootRun:         []Command{},
+		userRun:         []Command{},
+		fileTemplates:   []FileTemplate{},
+		entrypoint:      []string{},
+		cmd:             []string{},
 	}
 
 	for _, opt := range opts {
@@ -30,6 +30,22 @@ func NewBrick(id BrickID, description string, opts ...BrickOption) (Brick, error
 	}
 
 	return brick, nil
+}
+
+func WithCacheFolders(folders CacheFoldersPaths) BrickOption {
+	return func(bi *brick) error {
+		bi.cacheFolders = append(bi.cacheFolders, folders...)
+
+		return nil
+	}
+}
+
+func WithCacheFolder(folder string) BrickOption {
+	return func(bi *brick) error {
+		bi.cacheFolders = append(bi.cacheFolders, folder)
+
+		return nil
+	}
 }
 
 func WithKind(kind BrickKind) BrickOption {
@@ -45,8 +61,8 @@ func WithKind(kind BrickKind) BrickOption {
 
 func WithKinds(kinds []BrickKind) BrickOption {
 	return func(bi *brick) error {
-		kinds := append(bi.kinds.All(), kinds...)
-		newSet := NewBrickKindsSet(kinds...)
+		newKinds := append(bi.kinds.All(), kinds...)
+		newSet := NewBrickKindsSet(newKinds...)
 
 		bi.kinds = newSet
 
@@ -89,7 +105,7 @@ func WithEnv(k, v string) BrickOption {
 		}
 
 		bi.envs[k] = v
-		
+
 		return nil
 	}
 }
@@ -107,11 +123,10 @@ func WithEnvs(envs map[string]string) BrickOption {
 
 			bi.envs[k] = v
 		}
-		
+
 		return nil
 	}
 }
-
 
 func WithRootRun(command Command) BrickOption {
 	return func(bi *brick) error {
@@ -171,7 +186,7 @@ func WithWorkdir(workdir string) BrickOption {
 
 func WithEntrypoint(entrypoint []string) BrickOption {
 	return func(bi *brick) error {
-		if bi.entrypoint != nil && len(bi.entrypoint) > 0 {
+		if len(bi.entrypoint) > 0 {
 			return fmt.Errorf("[brick %s] Entrypoint already defined. Cannot override", bi.id)
 		}
 
@@ -183,7 +198,7 @@ func WithEntrypoint(entrypoint []string) BrickOption {
 
 func WithCmd(cmd []string) BrickOption {
 	return func(bi *brick) error {
-		if bi.cmd != nil && len(bi.cmd) > 0 {
+		if len(bi.cmd) > 0 {
 			return fmt.Errorf("[brick %s] CMD already defined. Cannot override", bi.id)
 		}
 
@@ -213,7 +228,8 @@ func WithBrick(b Brick) BrickOption {
 		WithWorkdir(b.Workdir())(bi)
 		WithEntrypoint(b.Entrypoint())(bi)
 		WithCmd(b.Cmd())(bi)
-	  
+		WithCacheFolders(b.CacheFolders())(bi)
+
 		return nil
 	}
 }

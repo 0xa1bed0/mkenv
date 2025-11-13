@@ -17,6 +17,9 @@ func NewNvim(map[string]string) (dockerfile.Brick, error) {
 				{Name: "tar"},
 			},
 		}),
+		dockerfile.WithCacheFolder("${MKENV_HOME}/.local/share/nvim"),
+		dockerfile.WithCacheFolder("${MKENV_HOME}/.local/state/nvim"),
+		dockerfile.WithCacheFolder("${MKENV_HOME}/.cache/nvim"),
 		// TODO: version and system arch
 		dockerfile.WithUserRun(dockerfile.Command{ 
 			When: "build", 

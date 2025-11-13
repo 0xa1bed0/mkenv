@@ -39,6 +39,10 @@ func NewGolang(metadata map[string]string) (dockerfile.Brick, error) {
 				{Name: "bison"},
 			},
 		}),
+		dockerfile.WithCacheFolder("${MKENV_HOME}/.cache/go-build"),
+		dockerfile.WithCacheFolder("${MKENV_HOME}/.cache/goimports"),
+		dockerfile.WithCacheFolder("${MKENV_HOME}/.cache/gopls"),
+		dockerfile.WithCacheFolder("${MKENV_HOME}/.gvm/pkgsets"),
 		dockerfile.WithEnv("GVM_DIR", "${MKENV_HOME}/.gvm"),
 		dockerfile.WithUserRun(dockerfile.Command{
 			When: "build",

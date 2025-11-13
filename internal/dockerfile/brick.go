@@ -2,10 +2,14 @@ package dockerfile
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 )
 
-type BrickID string
+type (
+	BrickID           string
+	CacheFoldersPaths []string
+)
 
 type Brick interface {
 	ID() BrickID
@@ -22,6 +26,8 @@ type Brick interface {
 	FileTemplates() []FileTemplate
 
 	PackageManager() PackageManager
+
+	CacheFolders() CacheFoldersPaths
 
 	Entrypoint() []string
 	Cmd() []string
@@ -73,6 +79,8 @@ type brick struct {
 
 	packageManager PackageManager
 
+	cacheFolders CacheFoldersPaths
+
 	workdir    string
 	entrypoint []string
 	cmd        []string
@@ -90,9 +98,11 @@ func (b *brick) FileTemplates() []FileTemplate {
 func (b *brick) PackageRequests() []PackageRequest {
 	return copyPackageRequests(b.packageRequests)
 }
-func (b *brick) PackageManager() PackageManager { return b.packageManager }
-func (b *brick) Entrypoint() []string           { return copyStrings(b.entrypoint) }
-func (b *brick) Cmd() []string                  { return copyStrings(b.cmd) }
+
+func (b *brick) CacheFolders() CacheFoldersPaths { return copyStrings(b.cacheFolders) }
+func (b *brick) PackageManager() PackageManager  { return b.packageManager }
+func (b *brick) Entrypoint() []string            { return copyStrings(b.entrypoint) }
+func (b *brick) Cmd() []string                   { return copyStrings(b.cmd) }
 
 // Safe-copy helpers
 func copyPackageRequests(r []PackageRequest) []PackageRequest {
@@ -109,9 +119,7 @@ func copyMap(m map[string]string) map[string]string {
 	}
 
 	out := make(map[string]string, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
+	maps.Copy(out, m)
 
 	return out
 }

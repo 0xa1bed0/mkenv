@@ -7,6 +7,7 @@ const zsh = "shell/zsh"
 func NewZsh(metadata map[string]string) (dockerfile.Brick, error) {
 	brick, err := dockerfile.NewBrick(zsh, "ZSH shell",
 		dockerfile.WithKind(dockerfile.BrickKindCommon),
+		dockerfile.WithCacheFolder("${MKENV_HOME}/.zshcache"),
 		dockerfile.WithPackageRequest(dockerfile.PackageRequest{
 			Reason: "install zsh",
 			Packages: []dockerfile.PackageSpec{
@@ -16,6 +17,14 @@ func NewZsh(metadata map[string]string) (dockerfile.Brick, error) {
 		dockerfile.WithRootRun(dockerfile.Command{
 			When: "build",
 			Argv: []string{"chsh", "-s", "/bin/zsh", "${MKENV_USERNAME}"},
+		}),
+		dockerfile.WithUserRun(dockerfile.Command{
+			When: "build",
+			Argv: []string{"mkdir", "-p", "${MKENV_HOME}/.zshcache"},
+		}),
+		dockerfile.WithUserRun(dockerfile.Command{
+			When: "build",
+			Argv: []string{"ln", "-s", "${MKENV_HOME}/.zshcache/.zsh_history", "${MKENV_HOME}/.zsh_history"},
 		}),
 		dockerfile.WithFileTemplate(dockerfile.FileTemplate{
 			ID:       "zshrc",

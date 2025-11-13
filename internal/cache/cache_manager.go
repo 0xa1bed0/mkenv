@@ -30,7 +30,7 @@ type CacheManager interface {
 		userPreferences *dockerfile.UserPreferences,
 		imageExists func(context.Context, ImageID) bool,
 		buildDockerfile func(ctx context.Context) (dockerFile dockerfile.Dockerfile, err error),
-		buildImageSync func(ctx context.Context, dockerFile dockerfile.Dockerfile) (ImageID, error),
+		buildImageSync func(ctx context.Context, dockerFile dockerfile.Dockerfile, tag string) (ImageID, error),
 	) (ImageID, error)
 }
 
@@ -64,7 +64,7 @@ func (c *Cache) ResolveImage(
 
 	imageExists func(context.Context, ImageID) bool,
 	buildDockerfile func(ctx context.Context) (dockerFile dockerfile.Dockerfile, err error),
-	buildImageSync func(ctx context.Context, dockerFile dockerfile.Dockerfile) (ImageID, error),
+	buildImageSync func(ctx context.Context, dockerFile dockerfile.Dockerfile, tag string) (ImageID, error),
 ) (ImageID, error) {
 	if imageExists == nil || buildImageSync == nil || buildDockerfile == nil {
 		return "", errors.New("helpers imageExists, buildImage, and buildDockerfile is mandatory for image resolving")
@@ -166,7 +166,8 @@ func (c *Cache) ResolveImage(
 		// we don't want to keep cache locked while building image.
 		c.mu.Unlock()
 
-		dockerImageID, dockerImageBuildErr := buildImageSync(ctx, dockerFile)
+		imageTag := composeImageTag(composePrefix(projectPath), userPreferenceKey, dockerfileKey)
+		dockerImageID, dockerImageBuildErr := buildImageSync(ctx, dockerFile, imageTag)
 		if dockerImageBuildErr != nil {
 			if e := c.mu.Lock(40); e != nil {
 				// we don't care about cache. See comment above
