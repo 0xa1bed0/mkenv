@@ -63,3 +63,5 @@ temp/
 .nvimlog
 .gocache 
 .gomod
+testproj
+Dockerfile
