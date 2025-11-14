@@ -12,6 +12,7 @@ import (
 type nopCloser struct {
 	*bytes.Reader
 }
+
 func (n *nopCloser) Close() error { return nil }
 
 func newInMemoryScanner(t *testing.T, data string, readSize KiB) *fileScanner {
@@ -21,9 +22,9 @@ func newInMemoryScanner(t *testing.T, data string, readSize KiB) *fileScanner {
 	}
 	reader := &nopCloser{Reader: bytes.NewReader([]byte(data))}
 	return &fileScanner{
-		reader:   bufio.NewReaderSize(reader, int(readSize)*1024),
+		reader:    bufio.NewReaderSize(reader, int(readSize)*1024),
 		closeFile: func() error { return reader.Close() },
-		readSize: int(readSize) * 1024,
+		readSize:  int(readSize) * 1024,
 	}
 }
 
@@ -112,9 +113,9 @@ func TestFileScannerFindPropagatesIOErrors(t *testing.T) {
 
 	broken := &errorReader{err: errors.New("boom")}
 	sc := &fileScanner{
-		reader:   bufio.NewReaderSize(broken, 1024),
+		reader:    bufio.NewReaderSize(broken, 1024),
 		closeFile: func() error { return broken.Close() },
-		readSize: 1024,
+		readSize:  1024,
 	}
 
 	if err := sc.Find([]byte("anything")); !errors.Is(err, broken.err) {

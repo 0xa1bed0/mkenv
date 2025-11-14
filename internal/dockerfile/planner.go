@@ -187,7 +187,7 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 		fileTemplates: []FileTemplate{},
 		entrypoint:    []string{},
 		cmd:           []string{},
-		cachePaths: []string{},
+		cachePaths:    []string{},
 		// TODO: let bricks configure it and make sure system args is not overriden by bricks
 		args: map[string]string{
 			"MKENV_USERNAME":  "dev",

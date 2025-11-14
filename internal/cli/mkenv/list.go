@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/0xa1bed0/mkenv/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -31,6 +30,9 @@ func newListCmd() *cobra.Command {
 				// fake data for now
 				{ID: "abc123", Name: "mkenv-myproj-abc123", Status: "running"},
 				{ID: "def456", Name: "mkenv-myproj-def456", Status: "exited"},
+				{ID: "def458", Name: "mkenv-myproj-def458", Status: "exited"},
+				{ID: "def459", Name: "mkenv-myproj-def459", Status: "exited"},
+				{ID: "def455", Name: "mkenv-myproj-def455", Status: "exited"},
 			}
 
 			if len(containers) == 0 {
@@ -45,11 +47,11 @@ func newListCmd() *cobra.Command {
 
 			// Optional: interactive pick when there are multiple
 			if len(containers) > 1 {
-				chosen, err := ui.SelectOne("Select container to inspect:", containers)
-				if err != nil {
-					return err
-				}
-				fmt.Printf("\nSelected: %s (%s)\n", chosen.Name, chosen.ID)
+				// chosen, err := ui.SelectOne("Select container to inspect:", containers)
+				// if err != nil {
+				// 	return err
+				// }
+				// fmt.Printf("\nSelected: %s (%s)\n", chosen.Name, chosen.ID)
 				// Could show more details, logs, etc.
 			}
 
@@ -59,4 +61,3 @@ func newListCmd() *cobra.Command {
 
 	return cmd
 }
-

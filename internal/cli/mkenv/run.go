@@ -15,11 +15,11 @@ import (
 )
 
 type runOptions struct {
-	Tools      []string
-	Langs      []string
-	Volumes    []string
-	Rebuild    bool
-	CleanCache bool
+	Tools        []string
+	Langs        []string
+	Volumes      []string
+	ForceRebuild bool
+	CleanCache   bool
 }
 
 func newRunCmd() *cobra.Command {
@@ -38,7 +38,7 @@ func newRunCmd() *cobra.Command {
 	cmd.Flags().StringSliceVar(&opts.Tools, "tools", nil, "Comma-separated tools to preconfigure (e.g. 'mux,nvim')")
 	cmd.Flags().StringSliceVar(&opts.Langs, "langs", nil, "Comma-separated languages to enable (e.g. 'nodejs,go')")
 	cmd.Flags().StringSliceVarP(&opts.Volumes, "volume", "v", nil, "Bind mount in 'host:container' format (may be repeated)")
-	cmd.Flags().BoolVar(&opts.Rebuild, "rebuild", false, "Force rebuild of the dev image")
+	cmd.Flags().BoolVar(&opts.ForceRebuild, "rebuild", false, "Force rebuild of the dev image")
 	cmd.Flags().BoolVar(&opts.CleanCache, "clean-cache", false, "Clean build cache before running")
 
 	// Store opts in command context
@@ -67,6 +67,7 @@ func runCmdRunE(cmd *cobra.Command, args []string) error {
 		pathArg = pwd
 	}
 
+	// TODO; refactor project - maybe introduce sqlite or something like that
 	project := project.ResolveProject(pathArg)
 
 	enablebricks := []dockerfile.BrickID{"shell/ohmyzsh"}
@@ -77,12 +78,14 @@ func runCmdRunE(cmd *cobra.Command, args []string) error {
 		enablebricks = append(enablebricks, dockerfile.BrickID("langs/"+lang))
 	}
 
+	// TODO: read this from filesystem in home dir, read this from project dir, read from args, merge
 	userPrefs := &dockerfile.UserPreferences{
 		EnableBricks:  enablebricks,
 		SystemBrickId: "system/debian",
 		BricksConfigs: map[dockerfile.BrickID]map[string]string{},
 	}
 
+	// TODO: move this path to constants
 	cacheManager, err := cache.NewCacheManager("/Users/anatolii/.mkenv/image-cache.json")
 	if err != nil {
 		// TODO: ignore this error
@@ -92,6 +95,7 @@ func runCmdRunE(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Second)
 	defer cancel()
 
+	// TODO: should this be part of project?
 	pathPtr, err := filesmanager.NewFileManager(project.Path)
 	if err != nil {
 		panic(err)
@@ -105,7 +109,7 @@ func runCmdRunE(cmd *cobra.Command, args []string) error {
 
 	orchestrator := cli.NewDockerImageBuildOrchestrator(dockerClient, cacheManager, planner)
 
-	imageTag, err := orchestrator.ResolveImageTag(ctx, project.Path, userPrefs, true)
+	imageTag, err := orchestrator.ResolveImageTag(ctx, project.Path, userPrefs, opts.ForceRebuild)
 	// TODO: fix it
 	project.ImageID = imageTag
 
@@ -115,6 +119,7 @@ func runCmdRunE(cmd *cobra.Command, args []string) error {
 	binds = append(binds, "/Users/anatolii/projects/albedo/tmux.conf:/home/dev/.tmux.conf")
 	// TODO: since we can't get var substitution here (replace ${MKENV_WORKDIR}) - lets make single and constant workdir across all envs
 	binds = append(binds, project.Path+":/workdir")
+	// TODO: binds should also include whatever sits in opts (cli args)
 
 	if err != nil {
 		panic(err)
@@ -142,4 +147,3 @@ func getRunOptions(ctx context.Context) *runOptions {
 	}
 	return v.(*runOptions)
 }
-

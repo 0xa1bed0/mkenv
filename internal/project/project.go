@@ -11,10 +11,9 @@ import (
 
 var invalidNameChars = regexp.MustCompile(`[^a-z0-9._-]+`)
 
-
 type Project struct {
-	Name string
-	Path string
+	Name    string
+	Path    string
 	ImageID string
 }
 
@@ -22,8 +21,8 @@ func ResolveProject(givenPath string) *Project {
 	path := resolveProjectPath(givenPath)
 
 	return &Project{
-		Name: projectNameFromPath(path),
-		Path: path,
+		Name:    projectNameFromPath(path),
+		Path:    path,
 		ImageID: "", // resolve from projects.json - this can be also used to list projects
 	}
 }

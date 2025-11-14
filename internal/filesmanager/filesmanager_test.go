@@ -19,8 +19,8 @@ type fakeFileInfo struct {
 	isDir bool
 }
 
-func (f fakeFileInfo) Name() string      { return f.name }
-func (f fakeFileInfo) Size() int64       { return 0 }
+func (f fakeFileInfo) Name() string { return f.name }
+func (f fakeFileInfo) Size() int64  { return 0 }
 func (f fakeFileInfo) Mode() fs.FileMode {
 	if f.isDir {
 		return fs.ModeDir
@@ -36,15 +36,17 @@ type fakeDirEntry struct {
 	isDir bool
 }
 
-func (f fakeDirEntry) Name() string               { return f.name }
-func (f fakeDirEntry) IsDir() bool                { return f.isDir }
+func (f fakeDirEntry) Name() string { return f.name }
+func (f fakeDirEntry) IsDir() bool  { return f.isDir }
 func (f fakeDirEntry) Type() fs.FileMode {
 	if f.isDir {
 		return fs.ModeDir
 	}
 	return 0
 }
-func (f fakeDirEntry) Info() (fs.FileInfo, error) { return fakeFileInfo{name: f.name, isDir: f.isDir}, nil }
+func (f fakeDirEntry) Info() (fs.FileInfo, error) {
+	return fakeFileInfo{name: f.name, isDir: f.isDir}, nil
+}
 
 func TestNewFileManagerWithOps_Validation(t *testing.T) {
 	t.Parallel()

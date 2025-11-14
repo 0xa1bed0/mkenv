@@ -12,12 +12,12 @@ const lockStaleAfter = 10 * time.Minute
 
 type FSMutex interface {
 	Lock(lockTryLimit int8) error
-	Unlock() 
+	Unlock()
 }
 
 type fsMutex struct {
 	lockPath string
-	locked bool
+	locked   bool
 }
 
 func (mu *fsMutex) Lock(lockTryLimit int8) error {

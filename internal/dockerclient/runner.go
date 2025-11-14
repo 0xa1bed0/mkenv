@@ -22,8 +22,8 @@ import (
 
 const (
 	dockerMaxNameLen = 255
-	shortLen         = 6        // length of the hash-like suffix
-	tailMarker       = "tail-"  // visible indicator that we trimmed the left side
+	shortLen         = 6       // length of the hash-like suffix
+	tailMarker       = "tail-" // visible indicator that we trimmed the left side
 )
 
 type cacheVolume struct {
@@ -57,9 +57,9 @@ func (dc *dockerClient) RunContainer(ctx context.Context, proj *project.Project,
 // ContainerName: "<project>-<short>", trimming from the LEFT if needed and
 // prefixing with "tail-" to show it was trimmed.
 func resolveContainerName(project string) string {
-	short := shortHash(project +
-		"|" + time.Now().UTC().Format(time.RFC3339Nano) +
-		"|" + procTag(),
+	short := shortHash(project+
+		"|"+time.Now().UTC().Format(time.RFC3339Nano)+
+		"|"+procTag(),
 		shortLen)
 
 	// Ideal: project + "-" + short
@@ -138,13 +138,13 @@ func (dc *dockerClient) resolveCacheVolumes(ctx context.Context, proj *project.P
 			Name:   volName,
 			Driver: "local",
 			Labels: map[string]string{
-				"mkenv": "1",
-				"mkenv_project": proj.Name,
+				"mkenv":            "1",
+				"mkenv_project":    proj.Name,
 				"mkenv_mount_path": path,
 			},
 		})
 		out = append(out, &cacheVolume{
-			Name: volName,
+			Name:      volName,
 			MountPath: path,
 		})
 		if err != nil {
@@ -157,7 +157,7 @@ func (dc *dockerClient) resolveCacheVolumes(ctx context.Context, proj *project.P
 
 func volumeName(projName string, path string) string {
 	normalizedPath := strings.ReplaceAll(strings.ReplaceAll(path, "/", "_"), ".", "_")
-	return "mkenv_cache_volume-"+projName+"-"+normalizedPath
+	return "mkenv_cache_volume-" + projName + "-" + normalizedPath
 }
 
 func (dc *dockerClient) runContainerRoutine(ctx context.Context, proj *project.Project, binds []string, controlChan chan int) (int64, error) {

@@ -1,10 +1,10 @@
 package cache
 
 import (
-	"maps"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"maps"
 	"path/filepath"
 	"sort"
 
@@ -39,7 +39,7 @@ func CacheKeyUserPreferences(projectAbsPath string, in *dockerfile.UserPreferenc
 }
 
 func normalizePrefs(p dockerfile.UserPreferences) dockerfile.UserPreferences {
-	out := p // this is intentional 
+	out := p // this is intentional
 
 	out.EnableBricks = cloneAndSortBricks(p.EnableBricks)
 	out.DisableBricks = cloneAndSortBricks(p.DisableBricks)

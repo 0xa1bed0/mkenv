@@ -5,4 +5,3 @@ package registry
 const _ = requiresGeneratedV1
 
 const requiresGeneratedV1 = GeneratedRegistryVersion // must exist in generated file
-

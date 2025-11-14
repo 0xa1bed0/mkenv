@@ -20,7 +20,7 @@ type (
 
 type Cache struct {
 	cacheFilePath string // JSON file
-	mu   FSMutex
+	mu            FSMutex
 }
 
 type CacheManager interface {
@@ -52,7 +52,7 @@ func NewCacheManager(path string) (CacheManager, error) {
 
 	c := &Cache{
 		cacheFilePath: path,
-		mu:   NewFSMutex(path + ".lock"),
+		mu:            NewFSMutex(path + ".lock"),
 	}
 
 	return c, nil
@@ -77,7 +77,6 @@ func (c *Cache) ResolveImage(
 	if err != nil {
 		hasValidUserPrefsKey = false
 	}
-
 
 	for {
 		// we are not fully rely on cache.

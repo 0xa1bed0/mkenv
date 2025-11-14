@@ -107,7 +107,7 @@ func (orc *DockerImageBuildOrchestrator) buildDockerfile(ctx context.Context) (d
 
 func (orc *DockerImageBuildOrchestrator) buildImageSync(ctx context.Context, dockerFile dockerfile.Dockerfile, tag string) (cache.ImageID, error) {
 	// TODO: make "mkenv:" in docker tag configurable
-	tag, err := orc.dockerClient.BuildImage(ctx, dockerFile.String(), "mkenv:" + tag)
+	tag, err := orc.dockerClient.BuildImage(ctx, dockerFile.String(), "mkenv:"+tag)
 	if err != nil {
 		return "", err
 	}

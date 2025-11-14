@@ -32,5 +32,5 @@ func init() {
 	rootCmd.AddCommand(newListCmd())
 	rootCmd.AddCommand(newAttachCmd())
 	rootCmd.AddCommand(newCleanCmd())
+	rootCmd.AddCommand(newUITestCmd())
 }
-

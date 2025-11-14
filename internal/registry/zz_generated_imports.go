@@ -7,5 +7,5 @@ import (
 	_ "github.com/0xa1bed0/mkenv/internal/bricks/systems"
 	_ "github.com/0xa1bed0/mkenv/internal/bricks/tools"
 )
-const GeneratedRegistryVersion = "v1"
 
+const GeneratedRegistryVersion = "v1"

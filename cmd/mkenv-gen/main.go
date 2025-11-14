@@ -20,11 +20,11 @@ func main() {
 
 	var imports []string
 	err = filepath.WalkDir("internal/bricks", func(path string, d fs.DirEntry, err error) error {
-		if err != nil { 
-			return err 
+		if err != nil {
+			return err
 		}
 		if !d.IsDir() {
-			return nil 
+			return nil
 		}
 
 		// allow local opt-out
@@ -35,12 +35,13 @@ func main() {
 		ents, _ := os.ReadDir(path)
 		hasGo := false
 		for _, e := range ents {
-			if e.IsDir() { 
+			if e.IsDir() {
 				continue
 			}
 			n := e.Name()
 			if strings.HasSuffix(n, ".go") && !strings.HasSuffix(n, "_test.go") {
-				hasGo = true; break
+				hasGo = true
+				break
 			}
 		}
 		if hasGo {
@@ -102,4 +103,3 @@ func dedupe(xs []string) []string {
 	}
 	return out
 }
-

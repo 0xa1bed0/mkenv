@@ -20,7 +20,7 @@ func (st *cacheState) getImageIDByUserPreferenceKey(key CacheKey) (ImageID, bool
 
 	if isBuilding(id) {
 		if isBuildingStale(id) {
-			// the cleanup is optional so no error propagated. 
+			// the cleanup is optional so no error propagated.
 			_ = st.cleanupUserPreferenceKey(key)
 			return "", false
 		}
@@ -37,7 +37,7 @@ func (st *cacheState) getImageIDByDockerfileKey(key CacheKey) (ImageID, bool) {
 
 	if isBuilding(id) {
 		if isBuildingStale(id) {
-			// the cleanup is optional so no error propagated. 
+			// the cleanup is optional so no error propagated.
 			_ = st.cleanupDockerfileKey(key)
 			return "", false
 		}
@@ -54,7 +54,7 @@ func (st *cacheState) cleanupUserPreferenceKey(key CacheKey) error {
 
 func (st *cacheState) cleanupDockerfileKey(key CacheKey) error {
 	delete(st.DockerfileKeyToImage, key)
-	
+
 	return st.commit()
 }
 
@@ -64,7 +64,6 @@ func (st *cacheState) cleanupImageID(userPreferenceKey, dockerfileKey CacheKey) 
 
 	return st.commit()
 }
-
 
 func (st *cacheState) setUserPreferenceKey(key CacheKey, imgID ImageID) error {
 	st.UserPreferenceKeyToImage[key] = imgID
@@ -81,7 +80,7 @@ func (st *cacheState) setImageID(userPreferenceKey, dockerfileKey CacheKey, imgI
 
 func (st *cacheState) commit() error {
 	if st.path == "" {
-		// this is a readonly state 
+		// this is a readonly state
 		return nil
 	}
 	// TODO: do error logging
@@ -98,9 +97,9 @@ func (st *cacheState) commit() error {
 
 func newEmptyCacheState(path string) *cacheState {
 	return &cacheState{
-		path: path,
+		path:                     path,
 		UserPreferenceKeyToImage: make(map[CacheKey]ImageID),
-		DockerfileKeyToImage: make(map[CacheKey]ImageID),
+		DockerfileKeyToImage:     make(map[CacheKey]ImageID),
 	}
 }
 

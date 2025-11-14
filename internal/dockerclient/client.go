@@ -22,7 +22,6 @@ func NewDockerClient() (*dockerClient, error) {
 	client, err := client.New(
 		context.Background(),
 		client.WithLogger(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))),
-
 	)
 	if err != nil {
 		return nil, err

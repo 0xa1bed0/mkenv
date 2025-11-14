@@ -50,6 +50,6 @@ source $ZSH/oh-my-zsh.sh
 	return brick, nil
 }
 
-func init () {
+func init() {
 	dockerfile.RegisterBrick(ohmyzsh, NewOhMyZsh)
 }

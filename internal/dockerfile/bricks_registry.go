@@ -11,8 +11,8 @@ type (
 
 type BricksRegistry struct {
 	mu        sync.RWMutex
-	bricks    map[BrickID]BrickFactory 
-	detectors []DetectorFactory       
+	bricks    map[BrickID]BrickFactory
+	detectors []DetectorFactory
 }
 
 func NewRegistry() *BricksRegistry {

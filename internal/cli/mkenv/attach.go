@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/0xa1bed0/mkenv/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -14,8 +13,12 @@ type ContainerInfo struct {
 	Status string
 }
 
-func (c ContainerInfo) OptionLabel() string {
+func (c *ContainerInfo) OptionLabel() string {
 	return fmt.Sprintf("%s  (%s)  [%s]", c.Name, c.ID, c.Status)
+}
+
+func (c *ContainerInfo) OptionID() string {
+	return c.ID
 }
 
 func newAttachCmd() *cobra.Command {
@@ -48,18 +51,18 @@ func newAttachCmd() *cobra.Command {
 				return nil
 			}
 
-			var target ContainerInfo
-			if len(containers) == 1 {
-				target = containers[0]
-			} else {
-				var err error
-				target, err = ui.SelectOne("Attach to which container?", containers)
-				if err != nil {
-					return err
-				}
-			}
+			// var target ContainerInfo
+			// if len(containers) == 1 {
+			// 	target = containers[0]
+			// } else {
+			// 	var err error
+			// 	target, err = ui.SelectOne("Attach to which container?", containers)
+			// 	if err != nil {
+			// 		return err
+			// 	}
+			// }
 
-			fmt.Printf("Attaching to %s (%s)...\n", target.Name, target.ID)
+			// fmt.Printf("Attaching to %s (%s)...\n", target.Name, target.ID)
 
 			// TODO: docker attach logic, using your dockerclient
 			return nil
@@ -68,4 +71,3 @@ func newAttachCmd() *cobra.Command {
 
 	return cmd
 }
-

@@ -22,7 +22,7 @@ func NewGolang(metadata map[string]string) (dockerfile.Brick, error) {
 	if !ok || version == "" {
 		version = "go1.25.3"
 	} else {
-		version = "go"+strings.Replace(version, "go", "", 1)
+		version = "go" + strings.Replace(version, "go", "", 1)
 	}
 
 	brick, err := dockerfile.NewBrick(golangID, golangDescription,
@@ -48,7 +48,7 @@ func NewGolang(metadata map[string]string) (dockerfile.Brick, error) {
 			When: "build",
 			Argv: []string{
 				"/bin/bash", "-lc", `set -eo pipefail 
-export GOLANG_VERSION=`+ version + ` 
+export GOLANG_VERSION=` + version + ` 
 curl -fsSL https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash || true
 if [ ! -s "$GVM_DIR/scripts/gvm" ]; then
   echo "gvm install failed"; exit 1

@@ -14,7 +14,7 @@ func (ps PackageSpec) Clone() PackageSpec {
 
 // PackageRequest is an abstract package reference.
 type PackageRequest struct {
-	Reason string
+	Reason   string
 	Packages []PackageSpec
 }
 
@@ -24,13 +24,13 @@ func (pr PackageRequest) Clone() PackageRequest {
 		specs[i] = spec.Clone()
 	}
 
-	return PackageRequest{ Reason: pr.Reason, Packages: specs }
+	return PackageRequest{Reason: pr.Reason, Packages: specs}
 }
 
 // PackageManager expands abstract PackageRequests into concrete root RUN steps.
 type PackageManager interface {
 	Name() string
-	Install(pkgs []PackageSpec) []Command 
+	Install(pkgs []PackageSpec) []Command
 }
 
 // ExpandPackages asks the system brick to convert requests to concrete steps.

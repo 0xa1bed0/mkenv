@@ -107,11 +107,14 @@ func MaxVersionFromConstraints(constraints []string) (string, error) {
 
 // collectCandidates scans constraint strings for version-like tokens and returns
 // a deduped slice of parsed *semver.Version. It normalizes partials:
-//   "16" -> "16.0.0", "16.2" -> "16.2.0". Leading "v" is allowed.
+//
+//	"16" -> "16.0.0", "16.2" -> "16.2.0". Leading "v" is allowed.
+//
 // Prereleases like "20.0.0-rc.1" are preserved.
 // Additionally, it synthesizes implied candidates from comparators:
-//   >v  or >=v  -> add (v.major+1).0.0
-//   <v  or <=v  -> add (v.major-1).0.0  (if major>0)
+//
+//	>v  or >=v  -> add (v.major+1).0.0
+//	<v  or <=v  -> add (v.major-1).0.0  (if major>0)
 func collectCandidates(cons []string) []*semver.Version {
 	// plain version literals (no operator required)
 	litRe := regexp.MustCompile(`(?i)\bv?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?\b`)
