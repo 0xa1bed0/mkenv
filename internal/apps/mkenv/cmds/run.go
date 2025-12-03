@@ -162,8 +162,8 @@ func mkbinds(project *runtime.Project) ([]string, error) {
 	binds := []string{}
 
 	// TODO: figure how to get MKENV_HOME here so we know where to mount these in advance
-	binds = append(binds, "/Users/anatolii/projects/dotconfigs/.config/nvim:/home/dev/.config/nvim")
-	binds = append(binds, "/Users/anatolii/projects/dotconfigs/.tmux.conf:/home/dev/.tmux.conf")
+	// binds = append(binds, "/Users/anatolii/projects/dotconfigs/.config/nvim:/home/dev/.config/nvim")
+	// binds = append(binds, "/Users/anatolii/projects/dotconfigs/.tmux.conf:/home/dev/.tmux.conf")
 	// TODO: since we can't get var substitution here (replace ${MKENV_WORKDIR}) - lets make single and constant workdir across all envs
 	binds = append(binds, project.Path()+":/workdir")
 	// TODO: binds should also include whatever sits in opts (cli args)
