@@ -1,28 +1,28 @@
 package tools
 
 import (
-	"github.com/0xa1bed0/mkenv/internal/dockerfile"
+	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 )
 
-const tmux = "tools/tmux"
+const tmux = "tmux"
 
-func NewTmux(map[string]string) (dockerfile.Brick, error) {
-	brick, err := dockerfile.NewBrick(tmux, "Terminal multiplexer",
-		dockerfile.WithKind(dockerfile.BrickKindCommon),
-		dockerfile.WithKind(dockerfile.BrickKindEntrypoint),
-		dockerfile.WithPackageRequest(dockerfile.PackageRequest{
+func NewTmux(map[string]string) (bricksengine.Brick, error) {
+	brick, err := bricksengine.NewBrick(tmux, "Terminal multiplexer",
+		bricksengine.WithKind(bricksengine.BrickKindCommon),
+		bricksengine.WithKind(bricksengine.BrickKindEntrypoint),
+		bricksengine.WithPackageRequest(bricksengine.PackageRequest{
 			Reason: "terminal multiplexer",
-			Packages: []dockerfile.PackageSpec{
+			Packages: []bricksengine.PackageSpec{
 				{Name: "tmux"},
 			},
 		}),
-		dockerfile.WithEntrypoint([]string{"/usr/bin/tmux", "-u"}),
+		bricksengine.WithEntrypoint([]string{"/usr/bin/tmux", "-u"}),
 		// TODO: make it user config (extraSteps???) - consider security checks -- or make brick with tmux plugins ???
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"mkdir", "-p", "${MKENV_HOME}/.config/tmux/plugins/catppuccin"},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"git", "clone", "-b", "v2.1.3", "https://github.com/catppuccin/tmux.git", "${MKENV_HOME}/.config/tmux/plugins/catppuccin/tmux"},
 		}),
@@ -35,5 +35,5 @@ func NewTmux(map[string]string) (dockerfile.Brick, error) {
 }
 
 func init() {
-	dockerfile.RegisterBrick(tmux, NewTmux)
+	bricksengine.RegisterBrick(tmux, NewTmux)
 }

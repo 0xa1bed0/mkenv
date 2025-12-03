@@ -38,7 +38,7 @@ Creates a full Docker dev environment with:
 * Auto-mounted project
 * Cached dependencies & build artifacts
 * Editor configs (optional)
-* Tmux + zsh environment
+* Tmux + zsh environment (optional)
 
 ### **Disposable Containers, Persistent Everything Else**
 
@@ -52,6 +52,8 @@ But `mkenv` persists everything you care about:
 * Dependency caches (`npm`, `go mod`, `pip`, …)
 
 You get **fresh container, warm caches**.
+
+You may reset cache or start container with no cache at all if you want.
 
 ### **Bricks: Modular Building Blocks**
 
@@ -158,11 +160,10 @@ home_-projects-myapp-123abc
 
 * Derived from the absolute path of your project
 * Home folder is replaced with `home_`
-* Truncated automatically when too long
 
 ### **3. Open an interactive shell**
 
-The container starts tmux/zsh by default.
+The container starts shell by default.
 Resizes dynamically with your terminal.
 
 ---
@@ -179,6 +180,8 @@ mkenv .
 
 Just exit the shell or tmux session.
 By default the container is removed.
+
+Warning of tmux sessions: when you do `ctrl+b d` and this was the last session attached to tmux - the container will exit and be removed.
 
 ### **Use with VS Code**
 
@@ -255,17 +258,58 @@ You can ship:
 
 ---
 
-## 🔄 Deterministic Cache Keys
+## 🔐 Guardrails and Policy engine
 
-Cache keys use:
+mkenv will try it's best to ensure safety of your work even before you start:
 
-* Dockerfile lines with prefixed lengths
-* Bricked sorted arguments
-* Short stable SHA256 identifiers
-
-This ensures rebuilds happen only when something truly changes.
+* It will scan project files before creating container and notify you if any possible secrets found in the folder - mkenv environment is not the place where your secrets should be.
+* You can configure where mkenv can run: folder whitelist to make sure you never start isolation outside your projects folder. 
+* You can restric bricks to be auto-detected.
+* You can configure allowlist for volume mounts to your container to make sure no sensitive folders will be available inside the container.
+* mkenv will automatically block folders like ~/.ssh to be mounted from your host - this not configurable and can't be omited.
 
 ---
+
+## 🕸️ Automatic Port Exposing
+
+Docker does not allow dynamically exposing new ports on a running container — once the container is started, its port mappings are fixed.
+So how are you supposed to run `npm run dev` and have it “just work”?
+
+The philosophy behind mkenv is that your development workflow should remain completely natural. You shouldn’t have to pre-declare ports, configure forwarding rules, or change your habits. Running npm run dev inside an mkenv environment should feel exactly like running it directly on your host.
+
+To make this possible, mkenv introduces a ultra-lightweight traffic forwarder on the host (no additional processes - it's all sitting inside your `mkenv .` invocation and dies when you exit the container) and an ultra-lightweight background proxy inside the container.
+
+How it works
+
+1. When you start mkenv (`mkenv .`), the host launches a tiny in-memmory forwarder.
+2. Inside the container, a background daemon continuously monitors `/proc` for new listening sockets.
+3. As soon as your application binds to a port — for example, when `npm run dev` starts listening on 3000 — the daemon detects it.
+4. It notifies the host forwarder, which automatically opens the corresponding host port and routes traffic into the container proxy.
+5. The proxy then forwards requests to your application exactly as if it were running on the host.
+
+The result
+
+A seamless, near-native development experience.
+
+Ports just work.
+
+Zero configuration.
+
+No Docker quirks leaking into your workflow.
+
+You run your tools.
+
+We make them reachable.
+
+### Additional Details
+
+* Supports TCP and optionally UDP listeners.
+* Works even if your dev server restarts or repeatedly binds/unbinds ports.
+* Adds virtually no overhead — both the forwarder and the proxy are extremely small.
+* Automatically handles multiple services listening on multiple ports.
+* If a host port is already in use, mkenv gracefully warns you and continues.
+* mkenv also attempts to prebind the port inside the container so you get a proper `EADDRINUSE` error, matching native host behavior exactly.
+* all traffic went through proxy is auditable and logged for later inspection
 
 ## 📦 Installation
 
@@ -296,11 +340,12 @@ go install github.com/0xa1bed0/mkenv@latest
 ### 🔧 Short-Term (Next Steps)
 
 * Add more Bricks (languages, tools, frameworks, LLM runtimes)
-* Improve global UX: user preferences, project configs, logging
 * In‑container management tool (ephemeral installs, runtime changes)
 * Internal refactoring + full test coverage
 * VS Code & Cursor extensions
-* Security policies & sandbox hardening
+* Network lockdown mode
+* Netowkr traffic audit (in and out container)
+* Safe `npm i` at docker build time 
 
 ### 🌱 Long-Term Vision
 
@@ -336,11 +381,4 @@ mkenv is **free for all real-world usage**, including organizational usage.
 - Offer mkenv as a hosted/managed service (SaaS)  
 - Embed mkenv into a commercial product  
 - Build or sell a commercial competitor based on mkenv  
-
-### 🏢 mkenv Enterprise
-A separate **closed-source enterprise edition** is available from  
-**Albedo Technologies SRL**  
-with additional features (e.g., team policies, security controls, orchestration).
-
-The enterprise edition is a separate product and not part of this repository.
 

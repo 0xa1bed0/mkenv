@@ -1,27 +1,27 @@
 package shells
 
-import "github.com/0xa1bed0/mkenv/internal/dockerfile"
+import "github.com/0xa1bed0/mkenv/internal/bricksengine"
 
-const ohmyzsh = "shell/ohmyzsh"
+const ohmyzsh = "ohmyzsh"
 
-func NewOhMyZsh(_ map[string]string) (dockerfile.Brick, error) {
+func NewOhMyZsh(_ map[string]string) (bricksengine.Brick, error) {
 	zsh, err := NewZsh(nil)
 
 	if err != nil {
 		return nil, err
 	}
 
-	brick, err := dockerfile.NewBrick(ohmyzsh, "OhMyZsh plugin for ZSH. Installs ZSH",
-		dockerfile.WithKind(dockerfile.BrickKindCommon),
-		dockerfile.WithBrick(zsh),
-		dockerfile.WithPackageRequest(dockerfile.PackageRequest{
+	brick, err := bricksengine.NewBrick(ohmyzsh, "OhMyZsh plugin for ZSH. Installs ZSH",
+		bricksengine.WithKind(bricksengine.BrickKindCommon),
+		bricksengine.WithBrick(zsh),
+		bricksengine.WithPackageRequest(bricksengine.PackageRequest{
 			Reason: "OhMyZsh install dependencies",
-			Packages: []dockerfile.PackageSpec{
+			Packages: []bricksengine.PackageSpec{
 				{Name: "ca-certificates"},
 				{Name: "git"},
 			},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"/bin/bash", "-lc", `
 export RUNZSH=no
@@ -31,7 +31,7 @@ export HOME=/tmp
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 mv /tmp/.oh-my-zsh ${MKENV_HOME}/.oh-my-zsh`},
 		}),
-		dockerfile.WithFileTemplate(dockerfile.FileTemplate{
+		bricksengine.WithFileTemplate(bricksengine.FileTemplate{
 			ID:       "ohmyzshrc",
 			FilePath: "${MKENV_HOME}/.zshrc",
 			Content: `# OhMyZsh config start 
@@ -51,5 +51,5 @@ source $ZSH/oh-my-zsh.sh
 }
 
 func init() {
-	dockerfile.RegisterBrick(ohmyzsh, NewOhMyZsh)
+	bricksengine.RegisterBrick(ohmyzsh, NewOhMyZsh)
 }

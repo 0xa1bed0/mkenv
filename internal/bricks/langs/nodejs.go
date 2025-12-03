@@ -1,18 +1,18 @@
 package langs
 
 import (
-	"github.com/0xa1bed0/mkenv/internal/dockerfile"
+	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/filesmanager"
 )
 
 const (
-	nodejsID          = dockerfile.BrickID("lang/nodejs")
+	nodejsID          = bricksengine.BrickID("nodejs")
 	nodejsDescription = "Golang toolchain"
 )
 
-var nodejsKinds = []dockerfile.BrickKind{dockerfile.BrickKindCommon}
+var nodejsKinds = []bricksengine.BrickKind{bricksengine.BrickKindCommon}
 
-func NewNodejs(metadata map[string]string) (dockerfile.Brick, error) {
+func NewNodejs(metadata map[string]string) (bricksengine.Brick, error) {
 	if metadata == nil {
 		metadata = make(map[string]string)
 	}
@@ -21,18 +21,18 @@ func NewNodejs(metadata map[string]string) (dockerfile.Brick, error) {
 		version = "lts/*"
 	}
 
-	brick, err := dockerfile.NewBrick(nodejsID, nodejsDescription,
-		dockerfile.WithKinds(nodejsKinds),
-		dockerfile.WithPackageRequest(dockerfile.PackageRequest{
+	brick, err := bricksengine.NewBrick(nodejsID, nodejsDescription,
+		bricksengine.WithKinds(nodejsKinds),
+		bricksengine.WithPackageRequest(bricksengine.PackageRequest{
 			Reason: "nvm install dependencies",
-			Packages: []dockerfile.PackageSpec{
+			Packages: []bricksengine.PackageSpec{
 				{Name: "curl"},
 				{Name: "ca-certificates"},
 				{Name: "git"},
 			},
 		}),
-		dockerfile.WithEnv("NVM_DIR", "${MKENV_HOME}/.nvm"),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithEnv("NVM_DIR", "${MKENV_HOME}/.nvm"),
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{
 				"/bin/bash", "-lc", `set -eo pipefail
@@ -46,6 +46,8 @@ major="${guess%%.*}"
 case "$NODE_VERSION" in
   lts/*)
     nvm install "$NODE_VERSION"
+		nvm alias default "$NODE_VERSION"
+		nvm use default
     ;;
   *)
     # try exact/partial match (e.g. 20 or 20.1)
@@ -60,14 +62,14 @@ case "$NODE_VERSION" in
 
     NODE_VERSION="$resolved"
     nvm install "v$NODE_VERSION"
+		nvm alias default "v$NODE_VERSION"
+		nvm use default
     ;;
 esac
-nvm alias default "v$NODE_VERSION"
-nvm use default
 	`,
 			},
 		}),
-		dockerfile.WithFileTemplate(dockerfile.FileTemplate{
+		bricksengine.WithFileTemplate(bricksengine.FileTemplate{
 			ID:       "lang/nodejs",
 			FilePath: "rc",
 			Content: `# Nodejs version manager start 
@@ -84,14 +86,14 @@ nvm use default
 }
 
 type nodejsDetector struct {
-	langDetector dockerfile.LangDetector
+	langDetector bricksengine.LangDetector
 }
 
-func (*nodejsDetector) BrickInfo() *dockerfile.BrickInfo {
-	return dockerfile.NewBrickInfo(nodejsID, nodejsDescription, nodejsKinds)
+func (*nodejsDetector) BrickInfo() *bricksengine.BrickInfo {
+	return bricksengine.NewBrickInfo(nodejsID, nodejsDescription, nodejsKinds)
 }
 
-func (gd *nodejsDetector) Scan(folderPtr filesmanager.FileManager) (dockerfile.BrickID, map[string]string, error) {
+func (gd *nodejsDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine.BrickID, map[string]string, error) {
 	found, brickMeta, err := gd.langDetector.ScanFiles(folderPtr)
 	if err != nil {
 		return "", nil, err
@@ -103,8 +105,8 @@ func (gd *nodejsDetector) Scan(folderPtr filesmanager.FileManager) (dockerfile.B
 }
 
 func init() {
-	dockerfile.RegisterBrick(nodejsID, NewNodejs)
-	dockerfile.RegisterDetector(func() dockerfile.BrickDetector {
-		return &nodejsDetector{langDetector: dockerfile.NewLangDetector("package.json", "js,ts,jsx", `"node": "`)}
+	bricksengine.RegisterBrick(nodejsID, NewNodejs)
+	bricksengine.RegisterDetector(func() bricksengine.BrickDetector {
+		return &nodejsDetector{langDetector: bricksengine.NewLangDetector(string(nodejsID), "package.json", "js,ts,jsx", `"node": "`)}
 	})
 }

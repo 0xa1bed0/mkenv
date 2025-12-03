@@ -8,31 +8,31 @@ import (
 	"github.com/docker/go-sdk/client"
 )
 
-type dockerClient struct {
+type DockerClient struct {
 	client client.SDKClient
 }
 
-type DockerClient interface {
-	DockerImageBuilder
-	DockerContainerRunner
-	ImageExists(context.Context, string) bool
-}
+var defaultDockerClient *DockerClient
 
-func NewDockerClient() (*dockerClient, error) {
-	client, err := client.New(
-		context.Background(),
-		client.WithLogger(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))),
-	)
-	if err != nil {
-		return nil, err
+func DefaultDockerClient() (*DockerClient, error) {
+	if defaultDockerClient == nil {
+		client, err := client.New(
+			context.Background(),
+			client.WithLogger(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{}))),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		defaultDockerClient = &DockerClient{
+			client: client,
+		}
 	}
 
-	return &dockerClient{
-		client: client,
-	}, nil
+	return defaultDockerClient, nil
 }
 
-func (dc *dockerClient) ImageExists(ctx context.Context, imageRef string) bool {
+func (dc *DockerClient) ImageExists(ctx context.Context, imageRef string) bool {
 	_, err := dc.client.ImageInspect(ctx, imageRef)
 
 	return err == nil

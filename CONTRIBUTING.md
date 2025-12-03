@@ -2,7 +2,7 @@
 
 Thank you for considering contributing to **mkenv**!
 
-mkenv is developed and maintained by **Albedo Technologies SRL** and released under the **Elastic License 2.0 (ELv2)**. The core is free for all personal and organizational internal use, while commercial resale and SaaS usage are restricted. A separate proprietary enterprise edition exists outside this repository.
+mkenv is developed and maintained by **Albedo Technologies SRL** and released under the **Elastic License 2.0 (ELv2)**. The core is free for all personal and organizational internal use, while commercial resale and SaaS usage are restricted.
 
 This document outlines how to contribute safely and effectively.
 
@@ -46,7 +46,6 @@ PRs are welcome for:
 
 PRs that are *not* accepted:
 
-* Enterprise-only features (team orchestration, policy engines, centralized management)
 * Features that weaken the security or isolation model
 * Integrations that depend on proprietary services
 * Licensing or trademark changes
@@ -78,6 +77,7 @@ By contributing to this repository, you agree that:
    * the open-source mkenv version
    * proprietary enterprise editions
    * derivative works
+
 3. You confirm that your contribution is your original work and does not violate third-party IP.
 
 This is standard for projects with an open-source core and a proprietary enterprise layer.

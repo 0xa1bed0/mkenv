@@ -8,41 +8,60 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/0xa1bed0/mkenv/internal/filesmanager"
+	sandboxappconfig "github.com/0xa1bed0/mkenv/internal/apps/sandbox/config"
+	"github.com/0xa1bed0/mkenv/internal/bricks/systems"
+	"github.com/0xa1bed0/mkenv/internal/bricksengine"
+	"github.com/0xa1bed0/mkenv/internal/runtime"
+
+	"github.com/0xa1bed0/mkenv/internal/logs"
+	"github.com/0xa1bed0/mkenv/internal/ui"
 )
 
-// UserPreferences is user overides for environment
-type UserPreferences struct {
-	EnableBricks      []BrickID
-	DisableBricks     []BrickID
-	BricksConfigs     map[BrickID]map[string]string
-	DisableAuto       bool
-	EntrypointBrickId BrickID
-	SystemBrickId     BrickID
-}
-
 type BuildPlan struct {
-	system Brick
+	system bricksengine.Brick
 	args   map[string]string
 
 	baseImage string
 
-	packages []PackageSpec
+	packages []bricksengine.PackageSpec
 	envs     map[string]string
-	rootRun  []Command
-	userRun  []Command
+	rootRun  []bricksengine.Command
+	userRun  []bricksengine.Command
 
-	fileTemplates []FileTemplate
+	fileTemplates []bricksengine.FileTemplate
 
 	entrypoint []string
 	cmd        []string
 
 	cachePaths []string
 
-	order []BrickID // for audit
+	order []bricksengine.BrickID // for audit
 }
 
-func (plan *BuildPlan) processBrick(brick Brick) CacheFoldersPaths {
+// ExpandPackages asks the system brick to convert requests to concrete steps.
+func (plan *BuildPlan) expandPackages() {
+	if plan == nil {
+		return
+	}
+	if plan.system == nil {
+		return
+	}
+
+	mgr := plan.system.PackageManager()
+	if mgr == nil {
+		return
+	}
+	if len(plan.packages) == 0 {
+		return
+	}
+
+	steps := mgr.Install(plan.packages)
+	if len(steps) > 0 {
+		plan.rootRun = append(plan.rootRun, steps...)
+	}
+}
+
+func (plan *BuildPlan) processBrick(brick bricksengine.Brick) bricksengine.CacheFoldersPaths {
 	for _, packageRequest := range brick.PackageRequests() {
 		for _, packageSpec := range packageRequest.Packages {
 			plan.packages = append(plan.packages, packageSpec.Clone())
@@ -55,122 +74,53 @@ func (plan *BuildPlan) processBrick(brick Brick) CacheFoldersPaths {
 	plan.order = append(plan.order, brick.ID())
 	plan.cachePaths = append(plan.cachePaths, brick.CacheFolders()...)
 
-	return CacheFoldersPaths{}
+	return bricksengine.CacheFoldersPaths{}
 }
-
-type PlanResult struct {
-	BuildPlan *BuildPlan
-	Err       error
-}
-
-type UserPrompt interface {
-	isUserPrompt()
-}
-
-type UserInputRequest[T comparable] struct {
-	Key     string
-	Prompt  string
-	Options map[T]string
-	Default T
-}
-
-func (UserInputRequest[T]) isUserPrompt() {}
-
-type UserInputResponse[T comparable] struct {
-	Key     string
-	Reponse T
-}
-
-func (UserInputResponse[T]) isUserPrompt() {}
-
-type Warning struct {
-	Msg string
-}
-
-func (Warning) isUserPrompt() {}
 
 type Planner interface {
-	Plan(ctx context.Context) <-chan PlanResult
-	UserPromptsChan() <-chan UserPrompt
-	UserPromptsResponsesChan() chan<- UserInputResponse[any]
+	Plan(ctx context.Context) (*BuildPlan, error)
 }
 
 type planner struct {
-	userPreferences      *UserPreferences
-	folderPtr            filesmanager.FileManager
-	userPrompts          chan UserPrompt
-	userResponses        chan UserInputResponse[any]
-	systemCandidates     map[BrickID]Brick
-	entrypointCandidates map[BrickID]Brick
+	project              *runtime.Project
+	systemCandidates     map[bricksengine.BrickID]bricksengine.Brick
+	entrypointCandidates map[bricksengine.BrickID]bricksengine.Brick
 
-	systemBrick     Brick
-	entrypointBrick Brick
-	bricks          map[BrickID]Brick
+	systemBrick     bricksengine.Brick
+	entrypointBrick bricksengine.Brick
+	bricks          map[bricksengine.BrickID]bricksengine.Brick
 }
 
-func NewPlanner(folderPtr filesmanager.FileManager, userPreferences *UserPreferences) Planner {
+func NewPlanner(project *runtime.Project) Planner {
 	return &planner{
-		userPreferences:      userPreferences,
-		folderPtr:            folderPtr,
-		userPrompts:          make(chan UserPrompt, 1),
-		userResponses:        make(chan UserInputResponse[any], 1),
-		systemCandidates:     make(map[BrickID]Brick),
-		entrypointCandidates: make(map[BrickID]Brick),
-		bricks:               make(map[BrickID]Brick),
+		project:              project,
+		systemCandidates:     make(map[bricksengine.BrickID]bricksengine.Brick),
+		entrypointCandidates: make(map[bricksengine.BrickID]bricksengine.Brick),
+		bricks:               make(map[bricksengine.BrickID]bricksengine.Brick),
 	}
 }
 
-func (p *planner) UserPromptsChan() <-chan UserPrompt {
-	return p.userPrompts
-}
+func (p *planner) Plan(ctx context.Context) (*BuildPlan, error) {
+	logs.Debugf("starting bricks estimation...")
+	err := p.estimateBricks(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-func (p *planner) UserPromptsResponsesChan() chan<- UserInputResponse[any] {
-	return p.userResponses
-}
+	logs.Debugf("processing system candidates...")
+	err = p.processSystemCandidates(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-func (p *planner) Plan(ctx context.Context) <-chan PlanResult {
-	ch := make(chan PlanResult, 1)
+	logs.Debugf("processing entrypoint candidates...")
+	err = p.processEntrypointCandidates(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	go func() {
-		defer close(p.userPrompts)
-		defer close(ch)
-		var out PlanResult
-		var err error
-
-		err = p.estimateBricks(ctx)
-		if err != nil {
-			out.Err = err
-			ch <- out
-			return
-		}
-
-		err = p.processSystemCandidates(ctx)
-		if err != nil {
-			out.Err = err
-			ch <- out
-			return
-		}
-
-		err = p.processEntrypointCandidates(ctx)
-		if err != nil {
-			out.Err = err
-			ch <- out
-			return
-		}
-
-		plan, err := p.buildPlan()
-		if err != nil {
-			out.Err = err
-			ch <- out
-			return
-		}
-
-		out.BuildPlan = plan
-
-		ch <- out
-	}()
-
-	return ch
+	logs.Debugf("compiling docker image build plan...")
+	return p.buildPlan()
 }
 
 func (p *planner) buildPlan() (*BuildPlan, error) {
@@ -180,23 +130,24 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 
 	plan := &BuildPlan{
 		system:        p.systemBrick,
-		packages:      []PackageSpec{},
+		packages:      []bricksengine.PackageSpec{},
 		envs:          map[string]string{},
-		rootRun:       []Command{},
-		userRun:       []Command{},
-		fileTemplates: []FileTemplate{},
+		rootRun:       []bricksengine.Command{},
+		userRun:       []bricksengine.Command{},
+		fileTemplates: []bricksengine.FileTemplate{},
 		entrypoint:    []string{},
 		cmd:           []string{},
 		cachePaths:    []string{},
 		// TODO: let bricks configure it and make sure system args is not overriden by bricks
+		// TODO: replace this with sandboxconfig. remove args entirely.
 		args: map[string]string{
-			"MKENV_USERNAME":  "dev",
-			"MKENV_UID":       "10000",
-			"MKENV_GID":       "10000",
-			"MKENV_HOME":      "/home/dev",
-			"MKENV_LOCAL_BIN": "/home/dev/local/bin",
+			"MKENV_USERNAME":  sandboxappconfig.UserName,
+			"MKENV_UID":       sandboxappconfig.UserUID,
+			"MKENV_GID":       sandboxappconfig.UserGID,
+			"MKENV_HOME":      sandboxappconfig.HomeFolder,
+			"MKENV_LOCAL_BIN": sandboxappconfig.UserLocalBin,
 		},
-		order: []BrickID{},
+		order: []bricksengine.BrickID{},
 	}
 
 	plan.baseImage = p.systemBrick.BaseImage()
@@ -206,6 +157,7 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 	if p.entrypointBrick != nil {
 		plan.entrypoint = p.entrypointBrick.Entrypoint()
 		plan.cmd = p.entrypointBrick.Cmd()
+		p.bricks[p.entrypointBrick.ID()] = p.entrypointBrick
 	}
 
 	// deterministic brick order: sort brick IDs
@@ -219,7 +171,7 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 		if sid == "" {
 			continue
 		}
-		id := BrickID(sid)
+		id := bricksengine.BrickID(sid)
 		brick := p.bricks[id]
 		if len(brick.RootRun()) > 0 {
 			runs := brick.RootRun()
@@ -227,8 +179,8 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 			for i, run := range runs {
 				commands[i] = "\t" + run.String()
 			}
-			// TODO: implement option to stop and wait for confirmation
-			p.userPrompts <- &Warning{Msg: "common brick " + string(brick.ID()) + " tries to execute root commands: \n\n" + strings.Join(commands, "\n")}
+			// TODO: make sure common brick really should not do this (think of shell bricks). and make user confirmation on this.
+			logs.Warnf("common brick " + string(brick.ID()) + " tries to execute root commands: \n\n" + strings.Join(commands, "\n"))
 		}
 		plan.processBrick(brick)
 	}
@@ -243,7 +195,7 @@ func (p *planner) processEntrypointCandidates(ctx context.Context) error {
 		return errors.New("please choose system brick first")
 	}
 
-	if p.systemBrick.Kinds().Contains(BrickKindEntrypoint) {
+	if p.systemBrick.Kinds().Contains(bricksengine.BrickKindEntrypoint) {
 		p.entrypointCandidates[p.systemBrick.ID()] = p.systemBrick
 	}
 
@@ -254,36 +206,42 @@ func (p *planner) processEntrypointCandidates(ctx context.Context) error {
 	if len(p.entrypointCandidates) == 1 {
 		for _, b := range p.entrypointCandidates {
 			p.entrypointBrick = b
-			break
+			return nil
+		}
+	}
+
+	defaultEntrypoint := p.project.EnvConfig(ctx).DefaultEntrypointBrickID()
+	if defaultEntrypoint != "" {
+		if entrypointBrick, ok := p.entrypointCandidates[defaultEntrypoint]; ok {
+			p.entrypointBrick = entrypointBrick
+			return nil
 		}
 	}
 
 	if len(p.entrypointCandidates) > 1 {
 		prompt := "Multiple entrypoints options found while estimating environment. Please choose one."
-		options := make(map[BrickID]string, len(p.entrypointCandidates)+1) // +1 to also have "none" options
+		options := make([]ui.SelectOption, len(p.entrypointCandidates)+1) // +1 to also have "none" options
+		i := 0
 		for candidateBrickID, entrypointBrick := range p.entrypointCandidates {
-			options[candidateBrickID] = fmt.Sprintf("[%s] ENTRYPOINT %s CMD %s", candidateBrickID, strings.Join(entrypointBrick.Entrypoint(), " "), strings.Join(entrypointBrick.Cmd(), " "))
+			options[i] = logs.NewSelectOption(fmt.Sprintf("[%s] ENTRYPOINT %s CMD %s", candidateBrickID, strings.Join(entrypointBrick.Entrypoint(), " "), strings.Join(entrypointBrick.Cmd(), " ")), string(candidateBrickID))
+			i++
 		}
-		options["none"] = "None (default to the base system)"
-		id, err := askUser(ctx, p.userPrompts, p.userResponses, &UserInputRequest[BrickID]{
-			Key:     "choose_entrypoint",
-			Prompt:  prompt,
-			Options: options,
-			Default: p.userPreferences.EntrypointBrickId,
-		})
+		// TODO: add entrypoint to the system brick
+		options[i] = logs.NewSelectOption("None (default to the base system)", "none")
+		selected, err := logs.PromptSelectOne(prompt, options)
 		if err != nil {
 			return err
 		}
 
-		if id == "none" {
+		if selected.OptionID() == "none" {
 			return nil
 		}
 
-		if id == "" && p.userPreferences.EntrypointBrickId == "" {
+		if selected.OptionID() == "" && p.project.EnvConfig(ctx).DefaultEntrypointBrickID() == "" {
 			return nil
 		}
 
-		p.entrypointBrick = p.entrypointCandidates[id]
+		p.entrypointBrick = p.entrypointCandidates[bricksengine.BrickID(selected.OptionID())]
 	}
 
 	return nil
@@ -291,10 +249,17 @@ func (p *planner) processEntrypointCandidates(ctx context.Context) error {
 
 func (p *planner) processSystemCandidates(ctx context.Context) error {
 	if len(p.systemCandidates) == 0 {
-		return errors.New("Can't build environment without base system.")
+		logs.Infof("no system candidates found using mkenv-default system: debian")
+		platformDefaultSystemBrick, err := systems.NewDebian(nil)
+		if err != nil {
+			return err
+		}
+		p.systemBrick = platformDefaultSystemBrick
+		return nil
 	}
 
 	if len(p.systemCandidates) == 1 {
+		logs.Debugf("only one system candidate found. using it...")
 		for _, b := range p.systemCandidates {
 			p.systemBrick = b
 			break
@@ -303,83 +268,50 @@ func (p *planner) processSystemCandidates(ctx context.Context) error {
 		return nil
 	}
 
-	if len(p.systemCandidates) > 1 {
-		prompt := "Multiple systems found while estimating environment. Please choose one."
-		options := make(map[BrickID]string, len(p.systemCandidates))
-		for candidateBrickID, systemBrick := range p.systemCandidates {
-			options[candidateBrickID] = fmt.Sprintf("[%s] %s", candidateBrickID, systemBrick.Description())
-		}
-		id, err := askUser(ctx, p.userPrompts, p.userResponses, &UserInputRequest[BrickID]{
-			Key:     "choose_system",
-			Prompt:  prompt,
-			Options: options,
-			Default: p.userPreferences.SystemBrickId,
-		})
-		if err != nil {
-			return err
-		}
-
-		if id == "" && p.userPreferences.SystemBrickId == "" {
-			return errors.New("Must choose system brick.")
-		}
-
-		p.systemBrick = p.systemCandidates[id]
+	logs.Debugf("multiple system candidates found")
+	prompt := "Multiple systems found while estimating environment. Please choose one."
+	options := make([]ui.SelectOption, len(p.systemCandidates))
+	for candidateBrickID, systemBrick := range p.systemCandidates {
+		options = append(options, logs.NewSelectOption(fmt.Sprintf("[%s] %s", candidateBrickID, systemBrick.Description()), string(candidateBrickID)))
 	}
+	selected, err := logs.PromptSelectOne(prompt, options)
+	if err != nil {
+		return err
+	}
+
+	if selected.OptionID() == "" && p.project.EnvConfig(ctx).DefaultSystemBrick() == "" {
+		return errors.New("must choose system brick")
+	}
+
+	p.systemBrick = p.systemCandidates[bricksengine.BrickID(selected.OptionID())]
 
 	return nil
 }
 
-func askUser[T comparable](ctx context.Context, requestCh chan UserPrompt, responseCh chan UserInputResponse[any], prompt *UserInputRequest[T]) (T, error) {
-	var zero T
-
-	select {
-	case requestCh <- prompt:
-	case <-ctx.Done():
-		return zero, ctx.Err()
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return zero, ctx.Err()
-		case resp := <-responseCh:
-			if resp.Key != prompt.Key {
-				continue
-			}
-			if resp.Reponse == nil {
-				return prompt.Default, nil
-			}
-			v, ok := resp.Reponse.(T)
-			if !ok {
-				return zero, fmt.Errorf("invalid response type for %s", prompt.Key)
-			}
-			return v, nil
-		}
-	}
-}
-
 func (p *planner) estimateBricks(ctx context.Context) error {
-	// TODO: maybe we just need to add those to candidates and not enable straight away
-	enabledBricks := append(p.userPreferences.EnableBricks, p.userPreferences.SystemBrickId, p.userPreferences.EntrypointBrickId)
+	enabledBricks := p.project.EnvConfig(ctx).EnableBricks()
+	if p.project.EnvConfig(ctx).DefaultEntrypointBrickID() != "" {
+		enabledBricks = append(enabledBricks, p.project.EnvConfig(ctx).DefaultEntrypointBrickID())
+	}
 
-	forceEnabled := toSet(enabledBricks)
-	forceDsiabled := toSet(p.userPreferences.DisableBricks)
+	forceEnabled := bricksengine.ToSet(enabledBricks)
+	forceDsiabled := bricksengine.ToSet(p.project.EnvConfig(ctx).DisableBricks())
 
-	add := func(b Brick, reason string) {
+	add := func(b bricksengine.Brick, reason string) {
 		id := b.ID()
 		if forceDsiabled[id] {
-			p.userPrompts <- &Warning{Msg: fmt.Sprintf("skipping disabled brick %s (reason: %s)", id, reason)}
+			logs.Warnf("skipping disabled brick %s (reason: %s)", id, reason)
 			return
 		}
 
-		if b.Kinds().Contains(BrickKindSystem) {
+		if b.Kinds().Contains(bricksengine.BrickKindSystem) {
 			// since we should completely discard non selected systems we can't add system bricks to the main bricks map.
 			// we will add single chosen system as entrypoint candidate later when we discard the rest
 			p.systemCandidates[id] = b
 			return
 		}
 
-		if b.Kinds().Contains(BrickKindEntrypoint) {
+		if b.Kinds().Contains(bricksengine.BrickKindEntrypoint) {
 			p.entrypointCandidates[id] = b
 		}
 
@@ -389,28 +321,31 @@ func (p *planner) estimateBricks(ctx context.Context) error {
 	}
 
 	for _, id := range enabledBricks {
-		if id == "" {
-			continue // TODO: fix enabledBricks composition
-		}
-		if factory, ok := DefaultBricksRegistry.GetBrickFactory(id); ok {
-			b, err := factory(p.userPreferences.BricksConfigs[id])
+		if factory, ok := bricksengine.DefaultBricksRegistry.GetBrickFactory(id); ok {
+			b, err := factory(p.project.EnvConfig(ctx).BricksConfigs()[id])
 			if err != nil {
 				return err
 			}
 			add(b, "enabled by user settings")
 		} else {
-			p.userPrompts <- &Warning{Msg: fmt.Sprintf("unknown brick id = \"%s\". skipping...", id)}
+			logs.Warnf("Unknown brick '%s'. Skipping...", id)
 		}
 	}
 
-	if !p.userPreferences.DisableAuto {
-		detectors := DefaultBricksRegistry.AllDetectors()
+	if !p.project.EnvConfig(ctx).ShouldDisableAuto() {
+		detectors := bricksengine.DefaultBricksRegistry.AllDetectors()
 		for _, d := range detectors {
-			if mentionsAny(d.BrickInfo().id, forceEnabled, forceDsiabled) {
+			if mentionsAny(d.BrickInfo().ID(), forceEnabled, forceDsiabled) {
 				continue // we already added forceEnabled bricks and we don't want to iterate over forceDisabled
 			}
 
-			id, meta, err := d.Scan(p.folderPtr)
+			folderPtr, err := p.project.FolderPtr()
+			if err != nil {
+				logs.Errorf("Can't scan project files: %v", err)
+				return err
+			}
+
+			id, meta, err := d.Scan(folderPtr)
 			if err != nil {
 				return err
 			}
@@ -418,7 +353,7 @@ func (p *planner) estimateBricks(ctx context.Context) error {
 				continue
 			}
 
-			if factory, ok := DefaultBricksRegistry.GetBrickFactory(id); ok {
+			if factory, ok := bricksengine.DefaultBricksRegistry.GetBrickFactory(id); ok {
 				b, err := factory(meta)
 				if err != nil {
 					return err
@@ -426,7 +361,7 @@ func (p *planner) estimateBricks(ctx context.Context) error {
 
 				add(b, "proposed by detector")
 			} else {
-				p.userPrompts <- &Warning{Msg: fmt.Sprintf("Detector proposed unknown brick %s", id)}
+				logs.Warnf("Detector proposed unknown brick %s", id)
 			}
 		}
 	}
@@ -434,16 +369,6 @@ func (p *planner) estimateBricks(ctx context.Context) error {
 	return nil
 }
 
-func toSet(xs []BrickID) map[BrickID]bool {
-	m := map[BrickID]bool{}
-	for _, x := range xs {
-		if x != "" {
-			m[x] = true
-		}
-	}
-	return m
-}
-
-func mentionsAny(id BrickID, en, dis map[BrickID]bool) bool {
+func mentionsAny(id bricksengine.BrickID, en, dis map[bricksengine.BrickID]bool) bool {
 	return en[id] || dis[id]
 }

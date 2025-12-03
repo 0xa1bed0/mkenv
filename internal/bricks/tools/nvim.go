@@ -1,57 +1,58 @@
 package tools
 
 import (
-	"github.com/0xa1bed0/mkenv/internal/dockerfile"
+	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 )
 
-const nvim = "tools/nvim"
+const nvim = "nvim"
 
-func NewNvim(map[string]string) (dockerfile.Brick, error) {
-	brick, err := dockerfile.NewBrick(nvim, "NeoVim",
-		dockerfile.WithKind(dockerfile.BrickKindCommon),
-		dockerfile.WithPackageRequest(dockerfile.PackageRequest{
+func NewNvim(map[string]string) (bricksengine.Brick, error) {
+	brick, err := bricksengine.NewBrick(nvim, "NeoVim",
+		bricksengine.WithKind(bricksengine.BrickKindCommon),
+		bricksengine.WithPackageRequest(bricksengine.PackageRequest{
 			Reason: "neovim installdependencies",
-			Packages: []dockerfile.PackageSpec{
+			Packages: []bricksengine.PackageSpec{
 				{Name: "ca-certificates"},
 				{Name: "curl"},
 				{Name: "tar"},
+				{Name: "build-essential"},
 			},
 		}),
-		dockerfile.WithCacheFolder("${MKENV_HOME}/.local/share/nvim"),
-		dockerfile.WithCacheFolder("${MKENV_HOME}/.local/state/nvim"),
-		dockerfile.WithCacheFolder("${MKENV_HOME}/.cache/nvim"),
+		bricksengine.WithCacheFolder("${MKENV_HOME}/.local/share/nvim"),
+		bricksengine.WithCacheFolder("${MKENV_HOME}/.local/state/nvim"),
+		bricksengine.WithCacheFolder("${MKENV_HOME}/.cache/nvim"),
 		// TODO: version and system arch
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"curl", "-fL", "-o", "nvim.tar.gz", "https://github.com/neovim/neovim/releases/download/v0.11.4/nvim-linux-arm64.tar.gz"},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"mkdir", "nvim"},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"tar", "xzf", "nvim.tar.gz", "-C", "nvim", "--strip-components=1"},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"ls", "-la"},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{When: "build", Argv: []string{"mkdir", "-p", "${MKENV_HOME}/.opt/nvim"}}),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{When: "build", Argv: []string{"mkdir", "-p", "${MKENV_HOME}/.opt/nvim"}}),
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"mv", "nvim", "${MKENV_HOME}/.opt"},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"ln", "-s", "${MKENV_HOME}/.opt/nvim/bin/nvim", "${MKENV_LOCAL_BIN}/nvim"},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"rm", "nvim.tar.gz"},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{When: "build", Argv: []string{"mkdir", "-p", "${MKENV_HOME}/.config/nvim"}}),
-		dockerfile.WithFileTemplate(dockerfile.FileTemplate{
+		bricksengine.WithUserRun(bricksengine.Command{When: "build", Argv: []string{"mkdir", "-p", "${MKENV_HOME}/.config/nvim"}}),
+		bricksengine.WithFileTemplate(bricksengine.FileTemplate{
 			ID:       "nvim aliases",
 			FilePath: "rc",
 			Content: `# NVIM aliases start
@@ -59,7 +60,7 @@ alias vim="nvim"
 alias vi="nvim"
 # NVIM aliases end`,
 		}),
-		dockerfile.WithFileTemplate(dockerfile.FileTemplate{
+		bricksengine.WithFileTemplate(bricksengine.FileTemplate{
 			ID:       "set nvim as default editor",
 			FilePath: "rc",
 			Content: `# NVIM start
@@ -76,5 +77,5 @@ export EDITOR="nvim"
 }
 
 func init() {
-	dockerfile.RegisterBrick(nvim, NewNvim)
+	bricksengine.RegisterBrick(nvim, NewNvim)
 }

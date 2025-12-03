@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/utils"
 )
 
@@ -119,7 +120,7 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 
 	// Audit label
 	if len(plan.order) > 0 {
-		uniq := toStrings(plan.order)
+		uniq := bricksengine.ToStrings(plan.order)
 		lines = append(lines, "", "# ───────────────────────────────────────────")
 		lines = append(lines, "# AUDIT LABELS")
 		lines = append(lines, fmt.Sprintf("LABEL mkenv.bricks=\"%s\"", strings.Join(uniq, ",")))
@@ -130,14 +131,6 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 	}
 
 	return lines
-}
-
-func toStrings(ids []BrickID) []string {
-	sids := make([]string, len(ids))
-	for i, id := range ids {
-		sids[i] = string(id)
-	}
-	return sids
 }
 
 func replaceVars(input string, vars map[string]string) string {
@@ -179,7 +172,7 @@ func sanitizeHeredocID(s string) string {
 	return b.String()
 }
 
-func heredocAppend(f FileTemplate, filePath string, buildArgs map[string]string) string {
+func heredocAppend(f bricksengine.FileTemplate, filePath string, buildArgs map[string]string) string {
 	id := sanitizeHeredocID(f.ID)
 	targetFile := replaceVars(filePath, buildArgs)
 	content := replaceVars(f.Content, buildArgs)

@@ -1,36 +1,38 @@
 package shells
 
-import "github.com/0xa1bed0/mkenv/internal/dockerfile"
+import "github.com/0xa1bed0/mkenv/internal/bricksengine"
 
-const zsh = "shell/zsh"
+const zsh = "zsh"
 
-func NewZsh(metadata map[string]string) (dockerfile.Brick, error) {
-	brick, err := dockerfile.NewBrick(zsh, "ZSH shell",
-		dockerfile.WithKind(dockerfile.BrickKindCommon),
-		dockerfile.WithCacheFolder("${MKENV_HOME}/.zshcache"),
-		dockerfile.WithPackageRequest(dockerfile.PackageRequest{
+func NewZsh(metadata map[string]string) (bricksengine.Brick, error) {
+	brick, err := bricksengine.NewBrick(zsh, "ZSH shell",
+		bricksengine.WithKind(bricksengine.BrickKindCommon),
+		bricksengine.WithKind(bricksengine.BrickKindEntrypoint),
+		bricksengine.WithCacheFolder("${MKENV_HOME}/.zshcache"),
+		bricksengine.WithPackageRequest(bricksengine.PackageRequest{
 			Reason: "install zsh",
-			Packages: []dockerfile.PackageSpec{
+			Packages: []bricksengine.PackageSpec{
 				{Name: "zsh"},
 			},
 		}),
-		dockerfile.WithRootRun(dockerfile.Command{
+		bricksengine.WithRootRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"chsh", "-s", "/bin/zsh", "${MKENV_USERNAME}"},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"mkdir", "-p", "${MKENV_HOME}/.zshcache"},
 		}),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"ln", "-s", "${MKENV_HOME}/.zshcache/.zsh_history", "${MKENV_HOME}/.zsh_history"},
 		}),
-		dockerfile.WithFileTemplate(dockerfile.FileTemplate{
+		bricksengine.WithFileTemplate(bricksengine.FileTemplate{
 			ID:       "zshrc",
 			FilePath: "${MKENV_HOME}/.zshrc",
 			Content:  `[ -s "${MKENV_HOME}/.mkenvrc" ] && . "${MKENV_HOME}/.mkenvrc"`,
 		}),
+		bricksengine.WithEntrypoint([]string{"/usr/bin/zsh"}),
 	)
 	if err != nil {
 		return nil, err
@@ -40,5 +42,5 @@ func NewZsh(metadata map[string]string) (dockerfile.Brick, error) {
 }
 
 func init() {
-	dockerfile.RegisterBrick(zsh, NewZsh)
+	bricksengine.RegisterBrick(zsh, NewZsh)
 }

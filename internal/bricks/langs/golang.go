@@ -3,18 +3,18 @@ package langs
 import (
 	"strings"
 
-	"github.com/0xa1bed0/mkenv/internal/dockerfile"
+	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/filesmanager"
 )
 
 const (
-	golangID          = dockerfile.BrickID("lang/golang")
+	golangID          = bricksengine.BrickID("golang")
 	golangDescription = "Golang toolchain"
 )
 
-var golangKinds = []dockerfile.BrickKind{dockerfile.BrickKindCommon}
+var golangKinds = []bricksengine.BrickKind{bricksengine.BrickKindCommon}
 
-func NewGolang(metadata map[string]string) (dockerfile.Brick, error) {
+func NewGolang(metadata map[string]string) (bricksengine.Brick, error) {
 	if metadata == nil {
 		metadata = make(map[string]string)
 	}
@@ -25,11 +25,11 @@ func NewGolang(metadata map[string]string) (dockerfile.Brick, error) {
 		version = "go" + strings.Replace(version, "go", "", 1)
 	}
 
-	brick, err := dockerfile.NewBrick(golangID, golangDescription,
-		dockerfile.WithKinds(golangKinds),
-		dockerfile.WithPackageRequest(dockerfile.PackageRequest{
+	brick, err := bricksengine.NewBrick(golangID, golangDescription,
+		bricksengine.WithKinds(golangKinds),
+		bricksengine.WithPackageRequest(bricksengine.PackageRequest{
 			Reason: "gvm install dependencies",
-			Packages: []dockerfile.PackageSpec{
+			Packages: []bricksengine.PackageSpec{
 				{Name: "curl"},
 				{Name: "ca-certificates"},
 				{Name: "git"},
@@ -39,12 +39,12 @@ func NewGolang(metadata map[string]string) (dockerfile.Brick, error) {
 				{Name: "bison"},
 			},
 		}),
-		dockerfile.WithCacheFolder("${MKENV_HOME}/.cache/go-build"),
-		dockerfile.WithCacheFolder("${MKENV_HOME}/.cache/goimports"),
-		dockerfile.WithCacheFolder("${MKENV_HOME}/.cache/gopls"),
-		dockerfile.WithCacheFolder("${MKENV_HOME}/.gvm/pkgsets"),
-		dockerfile.WithEnv("GVM_DIR", "${MKENV_HOME}/.gvm"),
-		dockerfile.WithUserRun(dockerfile.Command{
+		bricksengine.WithCacheFolder("${MKENV_HOME}/.cache/go-build"),
+		bricksengine.WithCacheFolder("${MKENV_HOME}/.cache/goimports"),
+		bricksengine.WithCacheFolder("${MKENV_HOME}/.cache/gopls"),
+		bricksengine.WithCacheFolder("${MKENV_HOME}/.gvm/pkgsets"),
+		bricksengine.WithEnv("GVM_DIR", "${MKENV_HOME}/.gvm"),
+		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{
 				"/bin/bash", "-lc", `set -eo pipefail 
@@ -70,7 +70,7 @@ go install golang.org/x/lint/golint@latest
 go install go.uber.org/mock/mockgen@latest`,
 			},
 		}),
-		dockerfile.WithFileTemplate(dockerfile.FileTemplate{
+		bricksengine.WithFileTemplate(bricksengine.FileTemplate{
 			ID:       "lang/golang",
 			FilePath: "rc",
 			Content: `# Golang version manager start
@@ -86,14 +86,14 @@ go install go.uber.org/mock/mockgen@latest`,
 }
 
 type golangDetector struct {
-	langDetector dockerfile.LangDetector
+	langDetector bricksengine.LangDetector
 }
 
-func (*golangDetector) BrickInfo() *dockerfile.BrickInfo {
-	return dockerfile.NewBrickInfo(golangID, golangDescription, golangKinds)
+func (*golangDetector) BrickInfo() *bricksengine.BrickInfo {
+	return bricksengine.NewBrickInfo(golangID, golangDescription, golangKinds)
 }
 
-func (gd *golangDetector) Scan(folderPtr filesmanager.FileManager) (dockerfile.BrickID, map[string]string, error) {
+func (gd *golangDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine.BrickID, map[string]string, error) {
 	found, brickMeta, err := gd.langDetector.ScanFiles(folderPtr)
 	if err != nil {
 		return "", nil, err
@@ -105,8 +105,8 @@ func (gd *golangDetector) Scan(folderPtr filesmanager.FileManager) (dockerfile.B
 }
 
 func init() {
-	dockerfile.RegisterBrick(golangID, NewGolang)
-	dockerfile.RegisterDetector(func() dockerfile.BrickDetector {
-		return &golangDetector{langDetector: dockerfile.NewLangDetector("go.mod", "go", "go ")}
+	bricksengine.RegisterBrick(golangID, NewGolang)
+	bricksengine.RegisterDetector(func() bricksengine.BrickDetector {
+		return &golangDetector{langDetector: bricksengine.NewLangDetector(string(golangID), "go.mod", "go", "go ")}
 	})
 }
