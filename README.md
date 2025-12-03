@@ -1,3 +1,17 @@
+> [!WARNING]
+>
+> ## 🚨 Early Stage Warning
+>
+> mkenv is **experimental software**.
+>
+> You should expect:
+>
+> * breaking changes
+> * incomplete features
+> * instability
+>
+> We’re releasing it early so developers can try it and give feedback. Thanks for being part of shaping mkenv!
+
 # mkenv
 
 [![License: Elastic License 2.0](https://img.shields.io/badge/license-Elastic%20License%202.0-blue)](#license)
