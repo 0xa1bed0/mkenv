@@ -107,6 +107,6 @@ func (gd *nodejsDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine
 func init() {
 	bricksengine.RegisterBrick(nodejsID, NewNodejs)
 	bricksengine.RegisterDetector(func() bricksengine.BrickDetector {
-		return &nodejsDetector{langDetector: bricksengine.NewLangDetector(string(nodejsID), "package.json", "js,ts,jsx", `"node": "`)}
+		return &nodejsDetector{langDetector: bricksengine.NewLangDetector(string(nodejsID), "package.json", "html,htm,htmlx,htmx,js,ts,jsx", `"node": "`)}
 	})
 }
