@@ -14,6 +14,7 @@
 
 # mkenv
 
+[![Website](https://img.shields.io/badge/website-online-green)](https://example.com)
 [![License: Elastic License 2.0](https://img.shields.io/badge/license-Elastic%20License%202.0-blue)](#license)
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen)](../../issues)
 ![Status: Active](https://img.shields.io/badge/status-active-success)
