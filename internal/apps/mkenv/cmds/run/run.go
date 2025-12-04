@@ -42,7 +42,7 @@ func AttachRunCmdFlags(cmd *cobra.Command) {
 	flags.StringVar(&opts.System, "system", "debian", "System brick id (e.g. 'debian')")
 	flags.StringVar(&opts.Shell, "shell", "ohmyzsh", "Shell to enable")
 	flags.StringSliceVar(&opts.Volumes, "volume", nil, "Bind mount in 'host:container' format (may be repeated)")
-	flags.BoolVar(&opts.ForceRebuild, "build", false, "Force rebuild of the dev image")
+	flags.BoolVar(&opts.ForceRebuild, "rebuild", false, "Force rebuild of the dev image. Update image cache for the next runs")
 
 	// Store opts in command context before running
 	cmd.PreRun = func(cmd *cobra.Command, args []string) {
@@ -133,7 +133,7 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	imageID, err := dockerImageResolver.ResolveImageID(signalsCtx, rt.Project())
+	imageID, err := dockerImageResolver.ResolveImageID(signalsCtx, rt.Project(), opts.ForceRebuild)
 	if err != nil {
 		return err
 	}
