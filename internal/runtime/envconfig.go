@@ -25,6 +25,7 @@ type EnvConfig interface {
 	DefaultEntrypointBrickID() bricksengine.BrickID
 	DefaultSystemBrick() bricksengine.BrickID
 	ShouldDisableAuto() bool
+	Volumes() []string
 
 	FilePath() string           // path to .mkenv file that correspond to this env config
 	Signature() (string, error) // return signature of the object
@@ -38,12 +39,41 @@ type envConfig struct {
 	DefaultEntrypointBrickID_ bricksengine.BrickID                       `json:"entrypoint"`
 	DefaultSystemBrick_       bricksengine.BrickID                       `json:"system"`
 	ShouldDisableAuto_        bool                                       `json:"disable_auto"`
+	Volumes_                  []string                                   `json:"volumes"`
+}
+
+func (ec envConfig) Copy() *envConfig {
+	newEncConfig := buildDefaultEnvConfig()
+	newEncConfig.name = ec.name
+	newEncConfig.EnableBricks_ = bricksengine.CopyBrickIDs(ec.EnableBricks_)
+	newEncConfig.DisableBricks_ = bricksengine.CopyBrickIDs(ec.DisableBricks_)
+	newEncConfig.BricksConfigs_ = map[bricksengine.BrickID]map[string]string{}
+	for brickID, brickConfig := range ec.BricksConfigs_ {
+		newEncConfig.BricksConfigs_[brickID] = map[string]string{}
+		for k, v := range brickConfig {
+			newEncConfig.BricksConfigs_[brickID][k] = v
+		}
+	}
+	newEncConfig.DefaultSystemBrick_ = ec.DefaultSystemBrick_
+	newEncConfig.DefaultEntrypointBrickID_ = ec.DefaultEntrypointBrickID_
+	newEncConfig.ShouldDisableAuto_ = ec.ShouldDisableAuto_
+	newEncConfig.Volumes_ = []string{}
+	for _, vol := range ec.Volumes_ {
+		newEncConfig.Volumes_ = append(newEncConfig.Volumes_, vol)
+	}
+	return newEncConfig
 }
 
 func (ec *envConfig) Signature() (string, error) {
 	// TODO: normalize before signature calculation
 
-	data, err := json.Marshal(ec)
+	ecCopy := ec.Copy()
+
+	// should not be included to sugnature because signature is a part of docker image cache key.
+	// TODO: move this whole signature function to the state package. it should not be here
+	ecCopy.Volumes_ = []string{}
+
+	data, err := json.Marshal(ecCopy)
 	if err != nil {
 		return "", err
 	}
@@ -119,11 +149,12 @@ func buildDefaultEnvConfig() *envConfig {
 		DefaultEntrypointBrickID_: "",
 		DefaultSystemBrick_:       "",
 		ShouldDisableAuto_:        false,
+		Volumes_:                  []string{},
 	}
 }
 
-func (ec *envConfig) BrickConfig(brickId bricksengine.BrickID) map[string]string {
-	cfg, ok := ec.BricksConfigs_[brickId]
+func (ec *envConfig) BrickConfig(brickID bricksengine.BrickID) map[string]string {
+	cfg, ok := ec.BricksConfigs_[brickID]
 	if !ok {
 		return make(map[string]string)
 	}
@@ -172,10 +203,18 @@ func (ec *envConfig) Merge(src EnvConfig) {
 	if src.ShouldDisableAuto() {
 		logs.Debugf("environment auto estimation is disabled by %s", src.FilePath())
 	}
+
+	ec.Volumes_ = append(ec.Volumes_, src.Volumes()...)
 }
 
 func (ec *envConfig) FilePath() string {
 	return ec.name
+}
+
+func (ec *envConfig) Volumes() []string {
+	out := []string{}
+	out = append(out, ec.Volumes_...)
+	return out
 }
 
 func (ec *envConfig) EnableBricks() []bricksengine.BrickID {
@@ -345,6 +384,10 @@ func applyPolicy(rc *envConfig, policy guardrails.Policy) error {
 				}
 				for _, p := range brickMounts {
 					allowed := false
+					if guardrails.IsAbsolutelyForbidden(p) {
+						allowed = false
+						break
+					}
 					for _, allowedMount := range policy.AllowedMounts() {
 						if guardrails.IsUnderPrefix(allowedMount, p) {
 							allowed = true
@@ -355,6 +398,23 @@ func applyPolicy(rc *envConfig, policy guardrails.Policy) error {
 						errors = append(errors, fmt.Errorf("mount path request from %s does not allowed by policy. (path %s is not under any allowed paths)", brick, p))
 					}
 				}
+			}
+		}
+		for _, vol := range rc.Volumes_ {
+			binds := strings.Split(vol, ":")
+			allowed := false
+			if guardrails.IsAbsolutelyForbidden(binds[0]) {
+				allowed = false
+				break
+			}
+			for _, allowedMount := range policy.AllowedMounts() {
+				if guardrails.IsUnderPrefix(allowedMount, binds[0]) {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				errors = append(errors, fmt.Errorf("mount path request from EnvConfig does not allowed by policy. (path %s is not under any allowed paths)", binds[0]))
 			}
 		}
 		if len(errors) > 0 {
@@ -388,6 +448,9 @@ func (p *Project) resolveEnvConfig(ctx context.Context) error {
 	}
 
 	envCfg := buildDefaultEnvConfig()
+	// TODO: restrict volumes config in project .mkenv -
+	// there is absolutely zero legit reasons to let project deside which folders to mount other than project folder
+	// which is automatically mounted
 	for _, prefPath := range prefsChain {
 		pref, errLoadPrefs := loadPreferencesFile(prefPath)
 		if errLoadPrefs != nil {

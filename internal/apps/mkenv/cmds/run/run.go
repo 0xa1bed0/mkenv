@@ -1,4 +1,4 @@
-package mkenv
+package runcmd
 
 import (
 	"context"
@@ -30,9 +30,9 @@ type runOptions struct {
 	CleanCache   bool
 }
 
-// attachRunCmdFlags attaches the "run" cmd flags to the given command and
+// AttachRunCmdFlags attaches the "run" cmd flags to the given command and
 // injects a runOptions instance into the command's context via PreRun.
-func attachRunCmdFlags(cmd *cobra.Command) {
+func AttachRunCmdFlags(cmd *cobra.Command) {
 	opts := &runOptions{}
 
 	flags := cmd.Flags()
@@ -74,7 +74,7 @@ func (ro *runOptions) EnvConfig() runtime.EnvConfig {
 	return cliRunConfig
 }
 
-func newRunCmd() *cobra.Command {
+func NewRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run [PATH]",
 		Short: "Run a dev container for the project",
@@ -82,16 +82,16 @@ func newRunCmd() *cobra.Command {
 
 If PATH is omitted, the current working directory is used.`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: runCmdRunE,
+		RunE: RunCmdRunE,
 	}
 
-	attachRunCmdFlags(cmd)
+	AttachRunCmdFlags(cmd)
 
 	return cmd
 }
 
-// runCmdRunE is a separate function so root can reuse it (default command)
-func runCmdRunE(cmd *cobra.Command, args []string) error {
+// RunCmdRunE is a separate function so root can reuse it (default command)
+func RunCmdRunE(cmd *cobra.Command, args []string) error {
 	logs.Debugf("running environment...")
 
 	rt := runtime.FromContext(cmd.Context())
@@ -134,10 +134,13 @@ func runCmdRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	imageID, err := dockerImageResolver.ResolveImageID(signalsCtx, rt.Project())
+	if err != nil {
+		return err
+	}
 
 	rt.Container().SetImageTag(string(imageID))
 
-	binds, err := mkbinds(project)
+	binds, err := mkbinds(signalsCtx, project)
 	if err != nil {
 		return err
 	}
@@ -158,15 +161,13 @@ func runCmdRunE(cmd *cobra.Command, args []string) error {
 	return containerOrchestrator.Start()
 }
 
-func mkbinds(project *runtime.Project) ([]string, error) {
-	binds := []string{}
+func mkbinds(ctx context.Context, project *runtime.Project) ([]string, error) {
+	binds, err := ResolveBinds(project.EnvConfig(ctx).Volumes())
+	if err != nil {
+		return nil, err
+	}
 
-	// TODO: figure how to get MKENV_HOME here so we know where to mount these in advance
-	// binds = append(binds, "/Users/anatolii/projects/dotconfigs/.config/nvim:/home/dev/.config/nvim")
-	// binds = append(binds, "/Users/anatolii/projects/dotconfigs/.tmux.conf:/home/dev/.tmux.conf")
-	// TODO: since we can't get var substitution here (replace ${MKENV_WORKDIR}) - lets make single and constant workdir across all envs
 	binds = append(binds, project.Path()+":/workdir")
-	// TODO: binds should also include whatever sits in opts (cli args)
 
 	agentHostPath := hostappconfig.AgentBinaryPath(project.Name())
 	if err := agentdist.ExtractAgent(agentHostPath); err != nil {

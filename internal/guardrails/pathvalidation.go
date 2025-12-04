@@ -161,7 +161,14 @@ func IsAbsolutelyForbidden(rawPath string) bool {
 }
 
 func IsUnderPrefix(base, path string) bool {
-	rel, err := filepath.Rel(base, path)
+	var err error
+	path, err = utils.ResolvePathStrict(path)
+	if err != nil {
+		return false
+	}
+
+	var rel string
+	rel, err = filepath.Rel(base, path)
 	if err != nil {
 		return false
 	}

@@ -1,6 +1,7 @@
 package mkenv
 
 import (
+	runcmd "github.com/0xa1bed0/mkenv/internal/apps/mkenv/cmds/run"
 	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/runtime"
 	"github.com/spf13/cobra"
@@ -18,7 +19,7 @@ By default, 'mkenv' is equivalent to 'mkenv run [PATH]'.
 If PATH is omitted, the current working directory is used.`,
 		Args: cobra.MaximumNArgs(1),
 		// Default behavior is the same as 'run'
-		RunE: runCmdRunE,
+		RunE: runcmd.RunCmdRunE,
 
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			logs.SetDebugVerbosity(verbosity)
@@ -32,9 +33,9 @@ If PATH is omitted, the current working directory is used.`,
 	rootCmd.PersistentFlags().CountVarP(&verbosity, "verbose", "v", "increase verbosity level")
 
 	// Root should accept the same flags as `run`
-	attachRunCmdFlags(rootCmd)
+	runcmd.AttachRunCmdFlags(rootCmd)
 
-	runCmd := newRunCmd()
+	runCmd := runcmd.NewRunCmd()
 	rootCmd.AddCommand(runCmd)
 
 	rootCmd.AddCommand(newListCmd())

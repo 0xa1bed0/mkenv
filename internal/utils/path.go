@@ -2,8 +2,10 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -17,6 +19,28 @@ var (
 //   - the path (or any symlink in it) is broken
 //   - symlink resolution fails (cycles, too deep, etc.)
 func ResolvePathStrict(p string) (string, error) {
+	if p == "" {
+		p = "."
+	}
+
+	// 0. Expand "~" prefix manually.
+	if strings.HasPrefix(p, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve home: %w", err)
+		}
+
+		// "~" or "~/something"
+		if p == "~" {
+			p = home
+		} else if strings.HasPrefix(p, "~/") {
+			p = filepath.Join(home, p[2:])
+		} else {
+			// If you want to support "~user/foo" you must handle that separately.
+			return "", fmt.Errorf("unsupported tilde form: %q", p)
+		}
+	}
+
 	// 1. Make absolute
 	abs, err := filepath.Abs(p)
 	if err != nil {

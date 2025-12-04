@@ -1,6 +1,5 @@
 module github.com/0xa1bed0/mkenv
 
-
 go 1.25.3
 
 require (
@@ -8,6 +7,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/docker/docker v28.5.2+incompatible
+	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-sdk/client v0.1.0-alpha011
 	github.com/docker/go-sdk/image v0.1.0-alpha012
 	github.com/moby/term v0.5.2
@@ -31,7 +31,6 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-sdk/config v0.1.0-alpha011 // indirect
 	github.com/docker/go-sdk/context v0.1.0-alpha011 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
