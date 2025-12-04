@@ -18,8 +18,6 @@
 [![License: Elastic License 2.0](https://img.shields.io/badge/license-Elastic%20License%202.0-blue)](#license)
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen)](../../issues)
 ![Status: Active](https://img.shields.io/badge/status-active-success)
-![Free for personal and commercial internal use](https://img.shields.io/badge/free%20for-personal%20%2B%20company%20use-green)
-![Not for SaaS or resale](https://img.shields.io/badge/restrictions-no%20SaaS%20%2F%20no%20resale-red)
 
 **mkenv** is a fast, secure, reproducible development environment generator. It creates fully isolated Docker-based dev environments in seconds — complete with your editor, tools, configs, caches, and volumes — without cluttering your host system.
 
