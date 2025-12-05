@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mkenv Documentation</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<header>
+    <div class="logo"><a href="index.html">mkenv.sh</a></div>
+    <nav>
+        <a href="#overview">Overview</a>
+        <a href="#installation">Installation</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#commands">Commands</a>
+        <a href="#configuration">Configuration &amp; Behavior</a>
+        <a href="#faq">FAQ</a>
+        <a href="index.html">Back to Landing</a>
+    </nav>
+</header>
+<div class="container">
+    <section id="overview">
+        <h2>Overview</h2>
+        <p>mkenv is a CLI that builds and runs per-project developer containers using Docker with security-focused defaults, disposable sessions, and caching for language tooling. It exists for devs who would rather yeet a container than reimage their laptop.</p>
+        <p>This documentation assumes you already live inside a terminal, know Docker basics, and understand that trusting random repos is a losing bet. We cover how to install, run, and bend mkenv without touching YAML.</p>
+    </section>
+
+    <section id="installation">
+        <h2>Installation</h2>
+        <div class="note">Platform: macOS only right now. Linux is on the radar, Windows likely via WSL later. Bring Docker Desktop or equivalent.</div>
+        <h3>Prerequisites</h3>
+        <ul>
+            <li>macOS 12+ on Apple Silicon.</li>
+            <li>Docker Desktop 4.x or Docker Engine with virtualization enabled.</li>
+            <li>Terminal basics (zsh/bash) and permissions to install binaries to <code>$PATH</code>.</li>
+        </ul>
+        <h3>Download &amp; Install</h3>
+        <ol>
+            <li>Grab the latest darwin-arm64 binary from GitHub Releases:</li>
+        </ol>
+        <pre><code>curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64 -o mkenv
+chmod +x mkenv
+sudo mv mkenv /usr/local/bin/</code></pre>
+        <ol start="2">
+            <li>Confirm it's on your PATH:</li>
+        </ol>
+        <pre><code>mkenv --version</code></pre>
+        <ol start="3">
+            <li>Ensure Docker is running before you launch containers.</li>
+        </ol>
+    </section>
+
+    <section id="quickstart">
+        <h2>Quickstart</h2>
+        <ol>
+            <li>Clone or enter the repo you want to sandbox.</li>
+            <li>Run <code>mkenv .</code>.</li>
+            <li>mkenv inspects manifests, builds a secure Docker image, and launches it.</li>
+            <li>You land inside a non-root shell with tools installed; open your editor inside if you want it confined.</li>
+        </ol>
+        <p>First run builds the full image and primes caches for package managers, compilers, language servers, and editor plugins. Subsequent runs reuse cached layers, so containers spin up quickly unless you force a rebuild.</p>
+    </section>
+
+    <section id="commands">
+        <h2>Commands</h2>
+        <div class="note">All commands accept <code>-h</code>/<code>--help</code> for usage details.</div>
+        <h3><code>mkenv</code> / <code>mkenv run</code></h3>
+        <p>Build (if necessary) and run a dev container for the current project.</p>
+        <pre><code>mkenv run [PATH] [flags]</code></pre>
+        <ul>
+            <li>Path defaults to <code>.</code>.</li>
+            <li>Analyzes the project, builds image, starts shell with mounts and caches.</li>
+        </ul>
+        <h2>Flags</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Flag</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Default</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>--tools</code></td>
+                    <td>comma list</td>
+                    <td>Extra tools to preinstall (e.g. <code>nvim,tmux,ripgrep</code>).</td>
+                    <td>none</td>
+                </tr>
+                <tr>
+                    <td><code>--langs</code></td>
+                    <td>comma list</td>
+                    <td>Hint runtimes to prioritize (node,go,python,rust).</td>
+                    <td>auto-detect</td>
+                </tr>
+                <tr>
+                    <td><code>--volume</code></td>
+                    <td>comma list</td>
+                    <td>Mount additional host directories inside the container. Support realtive path (e.g. "~/foo:~/foo")</td>
+                    <td>project dir only</td>
+                </tr>
+                <tr>
+                    <td><code>--rebuild</code></td>
+                    <td>bool</td>
+                    <td>Ignore cache and rebuild the image from scratch.</td>
+                    <td>false</td>
+                </tr>
+                <tr>
+                    <td><code>--shell</code></td>
+                    <td>string</td>
+                    <td>Preferred shell to launch inside the container (<code>bash</code>, <code>zsh</code>, <code>fish</code>).</td>
+                    <td>zsh</td>
+                </tr>
+                <tr>
+                    <td><code>--entrypoint</code></td>
+                    <td>string</td>
+                    <td>Preferred entrypoint (e.g. "tmux")</td>
+                    <td>none</td>
+                </tr>
+            </tbody>
+        </table>
+        <h3><code>mkenv attach</code></h3>
+        <p>Attach another shell or process to an existing container for the same project.</p>
+        <pre><code>mkenv attach [PATH]</code></pre>
+        <ul>
+            <li>Matches containers based on project fingerprint.</li>
+            <li>Useful for running GUI editors or additional terminals inside the same sandbox.</li>
+        </ul>
+        <h3><code>mkenv list</code></h3>
+        <p>List managed containers, images, and cache entries tracked by mkenv.</p>
+        <pre><code>mkenv list [--verbose]</code></pre>
+        <ul>
+            <li>Shows project path, container ID, status.</li>
+            <li><code>--verbose</code> adds cache location details.</li>
+        </ul>
+        <h3><code>mkenv clean</code></h3>
+        <p>Remove containers, images, and caches created by mkenv for a project or for all projects.</p>
+        <pre><code>mkenv clean [PATH] [--all]</code></pre>
+        <ul>
+            <li>Without flags, cleans the current project.</li>
+            <li><code>--all</code> wipes everything including shared caches.</li>
+        </ul>
+        <h3><code>mkenv completion</code></h3>
+        <p>Emit shell completion scripts for bash, zsh, or fish.</p>
+        <pre><code>mkenv completion [bash|zsh|fish]</code></pre>
+        <ul>
+            <li>Pipe the output into your shell config.</li>
+        </ul>
+        <h3><code>mkenv help</code></h3>
+        <p>Display inline help for commands/subcommands.</p>
+        <pre><code>mkenv help [command]</code></pre>
+    </section>
+
+
+    <section id="configuration">
+        <h2>Configuration &amp; Behavior</h2>
+        <h3>Stack Detection</h3>
+        <p>mkenv scans the project directory for manifests like <code>package.json</code>, <code>pnpm-lock.yaml</code>, <code>poetry.lock</code>, <code>requirements.txt</code>, <code>go.mod</code>, <code>Cargo.toml</code>, <code>Gemfile</code>, and <code>Dockerfile</code> fragments. Signals drive which language runtimes, package managers, and helper tools get baked into the image.</p>
+        <p>This scan also figures out sensible build contexts, env vars, and whether to preload IDE tooling like language servers.</p>
+        <h3>Security Defaults</h3>
+        <ul>
+            <li>Containers run as a non-root user with a locked-down <code>$HOME</code>.</li>
+            <li>Only the project directory mounts in read-write; no broad <code>/Users/you</code> mounts.</li>
+            <li>Shell history files are sanitized/disabled so secrets never spill back out.</li>
+            <li>SSH agent sockets and host credentials are excluded unless explicitly mounted.</li>
+        </ul>
+        <h3>Caching</h3>
+        <p>Language caches live under <code>~/Library/Caches/mkenv</code> (configurable later). Node modules, Go build cache, Rust crates, pip wheels, and editor plugin directories all reuse prior layers. Rebuild triggers only when relevant manifest or lockfiles change.</p>
+        <p>The contract is simple: run <code>mkenv .</code>, get a clean environment with the right tooling, no mental overhead, and a fast exit path if something looks off.</p>
+        <h3>Guardrails</h3>
+        <p>mkenv also scans your project files once to see if you about to mount anything sensitive to the container. If it will find any suspitious files (like your ssh keys, tokens, etc...) it will warn you and let you review them before starting environment.</p>
+        <p>The sandbox could potentially have credential stealers sneaked through supply chain attack - because of this we highly recoomend to no mount any secrets to the sandbox and keep them on your machine.</p>
+        <h3>How to access my local dev server?</h3>
+        <p>You can run your <code>npm run dev</code> as usual. Nothhing special is required by you. mkenv will magically make sure that when you access localhost:3000 from browser or postman or anything else you will be routed to the proper container and to the proper process.</p>
+    </section>
+
+    <section id="faq">
+        <h2>FAQ</h2>
+        <h3>Can I use this on Linux or Windows?</h3>
+        <p>Not officially yet. Linux support is near-term; Windows likely rides on WSL once the experience doesn't suck.</p>
+        <h3>Does mkenv replace Docker Desktop?</h3>
+        <p>No, it depends on Docker for virtualization. Think of mkenv as the paranoid orchestrator on top.</p>
+        <h3>Where is the cache stored?</h3>
+        <p>By default under <code>~/Library/Caches/mkenv</code> with subfolders per project fingerprint. Use <code>mkenv list --verbose</code> to inspect.</p>
+        <h3>What happens if the container dies?</h3>
+        <p>Run <code>mkenv .</code> again. You'll either reattach or get a fresh container using existing caches.</p>
+        <h3>Is this meant for production workloads?</h3>
+        <p>No. It's a dev tool for local workstations, not a deployment platform. If you push it to prod, that's on you.</p>
+        <h3>Can I keep my editor outside the container?</h3>
+        <p>Sure, but the safer move is to run Cursor/VS Code inside via the <code>--editor</code> flag so AI agents stay sandboxed.</p>
+        <h3>Is there telemetry?</h3>
+        <p>No analytics pings. If something breaks, file an issue rather than letting logs spy on you.</p>
+    </section>
+</div>
+<footer>
+  mkenv &middot; Elastic License 2.0 &middot; Built by <a href="https://albedohq.com" target="_blank">paranoid devs</a><br />
+  <p><a href="https://iusevimbtw.com" target="_blank">i use vim btw</a></p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mkenv | Disposable Dev Environments for Paranoid Devs</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<header>
+    <div class="logo"><a href="index.html">mkenv.sh</a></div>
+    <nav>
+        <a href="#overview">Overview</a>
+        <a href="#problem">Why</a>
+        <a href="#features">Features</a>
+        <a href="#how">How it Works</a>
+        <a href="#installation">Installation</a>
+        <a href="#license">License</a>
+        <a href="docs.html">Docs</a>
+        <a href="https://github.com/0xa1bed0/mkenv" target="_blank">GitHub</a>
+    </nav>
+</header>
+<div class="container">
+    <section class="hero" id="overview">
+        <h1>Zero-hustle isolation for whatever repo you touch next.</h1>
+        <p>mkenv is a CLI that spins up hardened, per-project Docker environments so you can run any repo without gambling your laptop.</p>
+        <p>It inspects your project, estimates what the environment should look like, builds a disposable Docker container around it, and keeps both your code and your LLM locked inside that sandbox.</p>
+        <p>Your host should only need: Docker, a browser, Slack, and one mkenv binary.</p>
+        <p>All toolchains, languages, packages, and scripts live and die inside mkenv.</p>
+        <div class="cta-group">
+            <a class="cta-primary" href="https://github.com/0xa1bed0/mkenv" target="_blank">View on GitHub</a>
+            <a class="cta-secondary" href="#installation">Get Started</a>
+            <a class="cta-secondary" href="docs.html">Read the Docs</a>
+        </div>
+    </section>
+
+    <section id="problem">
+        <h2>YEAH, THAT COULD BE YOU</h2>
+        <div class="problem-block">
+            <p>Every experienced developer knows this feeling: your laptop is a graveyard of old runtimes, global installs, random scripts, and half-forgotten projects. And every time you run an install command or setup script, you're quietly gambling with your entire machine.</p>
+            <p>I lost that gamble.</p>
+            <p>One fake interview task, one repo clone, one innocent-looking npm run – and suddenly I was rotating hundreds of passwords, revoking tokens, resetting SSH keys, reissuing cloud credentials, and eventually nuking my Mac because I had no idea what was touched.</p>
+            <p>And the painful part? I always knew I should be using isolated dev environments. But the moment I open a devcontainer.json or start thinking about a Dockerfile for local dev, my brain screams “not today”.</p>
+        </div>
+        <br />
+
+        That's exactly the pain mkenv removes. One command. Safe environment. No thinking. No disaster recovery next week.
+    </section>
+    <section id="truth">
+        <div class="">
+            <h3>THE UGLY TRUTH: YOUR LAPTOP CONTAINS MORE THAN YOU THINK</h3>
+            <p>Your development machine silently holds:</p>
+            <ul>
+                <li>SSH keys</li>
+                <li>GitHub and cloud tokens</li>
+                <li>browser cookies that bypass 2FA</li>
+                <li>password vaults</li>
+                <li>crypto wallets</li>
+                <li>personal documents</li>
+                <li>production credentials</li>
+            </ul>
+            <p>And you regularly run code that can access all of it:</p>
+            <ul>
+                <li>install scripts</li>
+                <li>postinstall hooks</li>
+                <li>transitive dependencies</li>
+                <li>build steps running arbitrary code</li>
+                <li>dev server boot scripts</li>
+                <li>AI-generated commands you barely skim</li>
+            </ul>
+            <p>One wrong dependency is enough to lose everything.</p>
+            <details class="spoiler">
+                <summary>Real supply-chain attacks (click to expand)<span>These aren’t hypotheticals. They already happened, in the ecosystems we use daily.</span></summary>
+                <div class="spoiler-content">
+                    <ol>
+                        <li>
+                          <p>The Shai-Hulud 2.0 npm worm [Supply Chain] [credential Theft] [Self-Propagation]</p>
+                          <p>A self-replicating npm worm known as Shai-Hulud was identified, backdooring hundreds of legitimate npm packages.</p>
+                          <p><a href="https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/" target="_blank">https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/</a></p>
+                        </li>
+                        <li>
+                            <p>XZ Utils Backdoor — [Supply Chain] [RCE]</p>
+                            <p>A core Linux library was backdoored to tamper with SSH authentication globally.</p>
+                            <p><a href="https://arxiv.org/abs/2504.17473" target="_blank">https://arxiv.org/abs/2504.17473</a></p>
+                        </li>
+                        <li>
+                            <p>Shai-Hulud NPM Worm — [Supply Chain] [Credential Theft] [Self-Propagation]</p>
+                            <p>A self-spreading npm worm stole tokens and auto-published malware using your credentials.</p>
+                            <p><a href="https://www.blackduck.com/blog/npm-malware-attack-shai-hulud-threat.html" target="_blank">https://www.blackduck.com/blog/npm-malware-attack-shai-hulud-threat.html</a></p>
+                        </li>
+                        <li>
+                            <p>NPM SSH-Key Stealers — [Credential Theft] [Postinstall Malware]</p>
+                            <p>Malicious postinstall scripts read ~/.ssh/id_rsa and uploaded it to attackers.</p>
+                            <p><a href="https://www.scworld.com/news/github-npm-registry-abused-to-host-ssh-key-stealing-malware" target="_blank">https://www.scworld.com/news/github-npm-registry-abused-to-host-ssh-key-stealing-malware</a></p>
+                        </li>
+                        <li>
+                            <p>PyTorch Dependency Confusion — [Supply Chain] [Credential Theft]</p>
+                            <p>A fake PyPI package exfiltrated SSH keys and tokens.</p>
+                            <p><a href="https://pytorch.org/blog/compromised-nightly-dependency/" target="_blank">https://pytorch.org/blog/compromised-nightly-dependency/</a></p>
+                        </li>
+                        <li>
+                            <p>colors.js / faker.js Sabotage — [Sabotage]</p>
+                            <p>The maintainer intentionally broke the world with malicious updates.</p>
+                            <p><a href="https://fossa.com/blog/npm-packages-colors-faker-corrupted/" target="_blank">https://fossa.com/blog/npm-packages-colors-faker-corrupted/</a></p>
+                        </li>
+                        <li>
+                            <p>Codecov Bash Uploader — [CI Compromise] [Credential Theft]</p>
+                            <p>A compromised CI script exfiltrated secrets from thousands of CI pipelines.</p>
+                            <p><a href="https://about.codecov.io/security-update/" target="_blank">https://about.codecov.io/security-update/</a></p>
+                        </li>
+                        <li>
+                            <p>PHP Git Server Backdoor — [RCE] [Account Takeover]</p>
+                            <p>Attackers pushed commits enabling RCE via HTTP headers.</p>
+                            <p><a href="https://news-web.php.net/php.internals/113838" target="_blank">https://news-web.php.net/php.internals/113838</a></p>
+                        </li>
+                        <li>
+                            <p>UA-Parser-JS Hijack — [Account Takeover] [Credential Theft] [Cryptominer]</p>
+                            <p>Stolen maintainer creds published malicious versions.</p>
+                            <p><a href="https://github.com/advisories/GHSA-pjwm-rvh2-c87w" target="_blank">https://github.com/advisories/GHSA-pjwm-rvh2-c87w</a></p>
+                        </li>
+                        <li>
+                            <p>Log4Shell — [RCE] [Ecosystem-Wide Vulnerability]</p>
+                            <p>A logging string triggered RCE in millions of Java systems.</p>
+                            <p><a href="https://en.wikipedia.org/wiki/Log4Shell" target="_blank">https://en.wikipedia.org/wiki/Log4Shell</a></p>
+                        </li>
+                        <li>
+                            <p>event-stream — [Supply Chain] [Credential Theft]</p>
+                            <p>A fake maintainer added a dependency stealing crypto wallets.</p>
+                            <p><a href="https://github.com/dominictarr/event-stream/issues/116" target="_blank">https://github.com/dominictarr/event-stream/issues/116</a></p>
+                        </li>
+                        <li>
+                            <p>ESLint-Scope — [Account Takeover] [Credential Theft]</p>
+                            <p>Breached maintainer account published malicious versions.</p>
+                            <p><a href="https://eslint.org/blog/2018/07/postmortem-for-malicious-package-publishes/" target="_blank">https://eslint.org/blog/2018/07/postmortem-for-malicious-package-publishes/</a></p>
+                        </li>
+                        <li>
+                            <p>RubyGems Backdoored Packages — [Supply Chain] [Credential Theft]</p>
+                            <p>Popular gems were replaced with malicious versions.</p>
+                            <p><a href="https://www.helpnetsecurity.com/2019/08/21/backdoored-ruby-gems/" target="_blank">https://www.helpnetsecurity.com/2019/08/21/backdoored-ruby-gems/</a></p>
+                        </li>
+                        <li>
+                            <p>npm Typosquatting — [Social Engineering]</p>
+                            <p>Misspelled packages harvested AWS keys and env vars.</p>
+                            <p><a href="https://docs.npmjs.com/threats-and-mitigations" target="_blank">https://docs.npmjs.com/threats-and-mitigations</a></p>
+                        </li>
+                        <li>
+                            <p>Octopus Scanner — [Build System Infection]</p>
+                            <p>Malware infected repos so every build produced compromised artifacts.</p>
+                            <p><a href="https://github.blog/security/vulnerability-research/the-octopus-scanner-malware-attacking-the-open-source-supply-chain/" target="_blank">https://github.blog/security/vulnerability-research/the-octopus-scanner-malware-attacking-the-open-source-supply-chain/</a></p>
+                        </li>
+                        <li>
+                            <p>XcodeGhost — [IDE Infection]</p>
+                            <p>Trojanized Xcode infected every iOS app built with it.</p>
+                            <p><a href="https://unit42.paloaltonetworks.com/novel-malware-xcodeghost-modifies-xcode-infects-apple-ios-apps-and-hits-app-store/" target="_blank">https://unit42.paloaltonetworks.com/novel-malware-xcodeghost-modifies-xcode-infects-apple-ios-apps-and-hits-app-store/</a></p>
+                        </li>
+                    </ol>
+                    <br />
+                    And many more… this is only the tip of the iceberg. 
+                </div>
+            </details>
+        </div>
+    </section>
+
+    <section id="what">
+        <h2>WHAT IS MKENV?</h2>
+        <p>mkenv is a CLI (Elastic License 2.0) that creates disposable Docker dev containers with hardened defaults and almost zero setup.</p>
+        <p>You run mkenv . in any folder.</p>
+        <p>mkenv inspects the codebase, estimates the correct environment, generates a Dockerfile, builds a safe container, and drops you inside it.</p>
+        <p>Your editor and LLM run inside the container instead of your laptop.</p>
+        <pre>Your host stays clean.
+Your secrets stay safe.</pre>
+        <script src="https://asciinema.org/a/NaufkeadmmN56lxWBscQD5Gmv.js" id="asciicast-NaufkeadmmN56lxWBscQD5Gmv" async="true"></script>
+        <h3 id="features">CORE FEATURES</h3>
+        <div class="columns">
+            <div class="feature-box">
+                <h3>Zero-Config Environment Estimation</h3>
+                <p>mkenv determines languages, versions, CLIs, OS dependencies, build tools—everything—by analyzing your repo.</p>
+                <p>No Dockerfiles. No devcontainers. No YAML.</p>
+            </div>
+            <div class="feature-box">
+                <h3>LLM/IDE Sandboxing</h3>
+                <p>Cursor, VS Code, JetBrains, Claude, Copilot—everything runs inside the container.</p>
+                <p>If the LLM goes wild, it only damages the sandbox.</p>
+            </div>
+            <div class="feature-box">
+                <h3>Disposable Environments</h3>
+                <p>Fresh container every run.</p>
+                <p>Cached dependencies for speed.</p>
+                <p>Throw away the environment the moment something feels off.</p>
+            </div>
+            <div class="feature-box">
+                <h3>Clean Host Principle</h3>
+                <p>Your host should only have Docker, Slack, browser, mkenv.</p>
+                <p>All toolchains live inside mkenv containers and die with them.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="how">
+        <h2>HOW MKENV WORKS</h2>
+        <ol class="steps-list">
+            <li>Run mkenv .</li>
+            <li>mkenv inspects the repo and estimates the required environment.</li>
+            <li>It generates a Dockerfile automatically.</li>
+            <li>It builds a hardened image.</li>
+            <li>It logs all network activity.</li>
+            <li>It logs all installed OS packages.</li>
+            <li>Suspicious mounts are blocked.</li>
+            <li>No sudo — use "mkenv sandbox" for controlled changes.</li>
+            <li>Exit the container — everything disappears.</li>
+        </ol>
+    </section>
+
+    <section id="security">
+        <h2>SECURITY BY DEFAULT</h2>
+        <ul>
+            <li>Non-root container user</li>
+            <li>Only project folders are mounted</li>
+            <li>No access to host secrets</li>
+            <li>Ephemeral container state</li>
+            <li>No tokens/keys in (bash|zsh|sh) history</li>
+            <li>All changes go through auditable commands</li>
+            <li>Full network + install logs</li>
+        </ul>
+        <p>If something bad happens, you just delete the container.</p>
+    </section>
+
+    <section id="installation">
+        <h2>Installation (macOS only for now)</h2>
+        <p>Linux is planned, Windows probably via WSL. Today it's macOS because that's where the founder got burned.</p>
+        <ol>
+            <li>Install Docker Desktop or Docker Engine. Make sure it's running.</li>
+            <li>Download the latest darwin-arm64 release from GitHub:</li>
+        </ol>
+        <pre><code>curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64 -o mkenv
+chmod +x mkenv
+sudo mv mkenv /usr/local/bin/</code></pre>
+        <ol start="3">
+            <li>Run <code>mkenv .</code> inside any project folder.</li>
+            <li>Let it analyze the repo, build the container, and drop you in.</li>
+        </ol>
+        <p>Next runs reuse caches, so you're back in fast. No devcontainer JSON headache.</p>
+    </section>
+
+    <section id="license">
+        <h2>License (Elastic License 2.0)</h2>
+        <p>Use mkenv anywhere—personal projects, at work, across your entire company. Just don't turn around and sell it as your own product.</p>
+        <div class="license-box">
+            <p><strong>Allowed:</strong> personal hacking, using at work, org-wide installs, CI pipelines, internal tooling, forks with local mods.</p>
+            <p><strong>Not allowed:</strong> reselling mkenv, reselling forks, shipping it as SaaS, embedding it into commercial products, or building a hosted competitor out of it.</p>
+            <p>ELv2 keeps it free for devs while preventing someone from cloning it into a sketchy cloud service. No enterprise upsell, just guardrails.</p>
+        </div>
+    </section>
+
+    <section id="outro">
+        <h2>TIRED DEVS MAKING LLM-ERA DEVELOPMENT LESS DANGEROUS</h2>
+        <p>We're not a big corporation or Security Enterprise Platform™.</p>
+        <p>We’re devs who got burned by running untrusted code and finally snapped.</p>
+        <p>This is the tool we wish existed before running that one bad command.</p>
+        <p>If you're thinking: "yeah… this is exactly the thing I've been too lazy to build myself" —</p>
+        <p>Good.</p>
+        <p>We built it for you.</p>
+        <p><a href="https://github.com/0xa1bed0/mkenv" target="_blank">Star mkenv on GitHub</a></p>
+    </section>
+</div>
+<footer>
+  mkenv &middot; Elastic License 2.0 &middot; Built by <a href="https://albedohq.com" target="_blank">paranoid devs</a><br />
+  <p><a href="https://iusevimbtw.com" target="_blank">i use vim btw</a></p>
+</footer>
+</body>
+</html>
