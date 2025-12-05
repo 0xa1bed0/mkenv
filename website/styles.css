@@ -153,6 +153,25 @@ details.spoiler .spoiler-content {
 details.spoiler ol {
     padding-left: 18px;
 }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+table th, table td {
+    border: 1px solid #9ca3b8;
+    padding: 8px;
+    text-align: left;
+}
+table th {
+    background: #eef1f8;
+}
+.note {
+    background: #fff4d8;
+    border: 1px solid #d6c48c;
+    padding: 12px;
+    font-size: 14px;
+}
 footer {
     text-align: center;
     margin-top: 40px;
