@@ -2,11 +2,16 @@ package protocol
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"log"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/0xa1bed0/mkenv/internal/logs"
 )
 
 // WriteProxyHeader writes "PORT <port>\n" to w.
@@ -39,19 +44,58 @@ func ReadProxyHeader(r *bufio.Reader) (int, error) {
 }
 
 // PumpBidirectional copies bytes both ways between a and b until both sides close.
-func PumpBidirectional(a, b io.ReadWriter) {
+func PumpBidirectional(a, b net.Conn) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
+	// a -> b
 	go func() {
 		defer wg.Done()
-		_, _ = io.Copy(a, b)
+		copyOneWay(b, a)
 	}()
 
+	// b -> a
 	go func() {
 		defer wg.Done()
-		_, _ = io.Copy(b, a)
+		copyOneWay(a, b)
 	}()
 
+	// Wait until both directions finished, then fully close.
 	wg.Wait()
+	_ = a.Close()
+	_ = b.Close()
+}
+
+// copyOneWay copies src -> dst, then half-closes dst's write side.
+// If the other goroutine is still copying the opposite direction,
+// its io.Copy will eventually hit EOF / error and cleanly finish.
+func copyOneWay(dst, src net.Conn) {
+	_, err := io.Copy(dst, src)
+	if err != nil && !isNormalCloseErr(err) {
+		log.Printf("copy %s -> %s error: %v", src.RemoteAddr(), dst.RemoteAddr(), err)
+	}
+
+	// Important: half-close write side, not full close, so the
+	// other direction can still use the connection for a bit.
+	if tcp, ok := dst.(*net.TCPConn); ok {
+		_ = tcp.CloseWrite()
+	} else {
+		_ = dst.Close()
+	}
+}
+
+func isNormalCloseErr(err error) bool {
+	logs.Infof("got error: %v", err)
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, net.ErrClosed) {
+		return true
+	}
+	msg := err.Error()
+	// These are common, non-fatal shutdown cases.
+	return strings.Contains(msg, "use of closed network connection") ||
+		strings.Contains(msg, "closed by the remote host") ||
+		strings.Contains(msg, "reset by peer") ||
+		strings.Contains(msg, "broken pipe")
 }

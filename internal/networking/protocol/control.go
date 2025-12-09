@@ -354,7 +354,7 @@ func (s *ControlServerProtocol) Serve() error {
 		s.muAgents.Unlock()
 
 		conn.OnMessage(func(env ControlSignalEnvelope) {
-			s.rt.Go(func() {
+			s.rt.GoNamed("ControlServer:DispatchEnvelope", func() {
 				s.dispatch(conn, env)
 			})
 		})

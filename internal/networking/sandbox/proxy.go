@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"net"
 
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
@@ -17,7 +16,7 @@ import (
 type ProxyServer struct {
 	rt     *runtime.Runtime
 	addr   string
-	server *transport.TCPServer
+	server *transport.Server
 }
 
 func NewProxyServer(rt *runtime.Runtime) *ProxyServer {
@@ -30,8 +29,8 @@ func NewProxyServer(rt *runtime.Runtime) *ProxyServer {
 func (p *ProxyServer) Run(ctx context.Context) error {
 	logs.Infof("[mkenv-agent] proxy listening on %s", p.addr)
 
-	server, err := transport.ServeTCP(p.rt, p.addr, func(conn net.Conn) {
-		p.handleConn(ctx, conn)
+	server, err := transport.ServeTCP(p.rt, p.addr, func(servctx context.Context, conn net.Conn) {
+		p.handleConn(servctx, conn)
 	})
 	if err != nil {
 		return fmt.Errorf("proxy listen on %s: %w", p.addr, err)
@@ -42,9 +41,16 @@ func (p *ProxyServer) Run(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return nil
-	case <-server.Done:
-		return fmt.Errorf("proxy listener on %s stopped unexpectedly", p.addr)
 	}
+}
+
+type bufferedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (c *bufferedConn) Read(p []byte) (int, error) {
+	return c.r.Read(p)
 }
 
 func (p *ProxyServer) handleConn(ctx context.Context, clientConn net.Conn) {
@@ -60,22 +66,23 @@ func (p *ProxyServer) handleConn(ctx context.Context, clientConn net.Conn) {
 		return
 	}
 
-	targetAddr := fmt.Sprintf("127.0.0.1:%d", port)
+	targetAddr := fmt.Sprintf("localhost:%d", port)
 	backendConn, err := net.Dial("tcp", targetAddr)
 	if err != nil {
 		logs.Errorf("[mkenv-agent] proxy: dial backend %s for %s: %v", targetAddr, remote, err)
+		clientConn.Close()
 		return
 	}
 	defer backendConn.Close()
 
 	logs.Infof("[mkenv-agent] proxy: %s -> %s (start)", remote, targetAddr)
 
-	clientRW := struct {
-		io.Reader
-		io.Writer
-	}{Reader: r, Writer: clientConn}
+	client := &bufferedConn{
+		Conn: clientConn,
+		r:    r,
+	}
 
-	protocol.PumpBidirectional(clientRW, backendConn)
+	protocol.PumpBidirectional(client, backendConn)
 
 	logs.Infof("[mkenv-agent] proxy: %s -> %s (done)", remote, targetAddr)
 }

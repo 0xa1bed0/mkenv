@@ -17,34 +17,16 @@ type ControlClient struct {
 }
 
 func NewControlClientFromEnv(ctx context.Context) (*ControlClient, error) {
-	netw := os.Getenv("MKENV_RPC")
-	switch netw {
-	case "tcp":
-		addr := os.Getenv("MKENV_ADDR")
-		if addr == "" {
-			return nil, errors.New("MKENV_ADDR missing")
-		}
-		raw, err := transport.DialTCP(ctx, addr, 200, 50*time.Millisecond)
-		if err != nil {
-			return nil, err
-		}
-		cc := protocol.NewControlConn(raw)
-		return &ControlClient{conn: cc}, nil
-
-	case "unix":
-		sock := os.Getenv("MKENV_SOCK")
-		if sock == "" {
-			sock = "/mkenv/state/api.sock"
-		}
-		raw, err := transport.DialUnix(ctx, sock, 200, 50*time.Millisecond)
-		if err != nil {
-			return nil, err
-		}
-		cc := protocol.NewControlConn(raw)
-		return &ControlClient{conn: cc}, nil
-	default:
-		return nil, errors.New("MKENV_RPC not set or unsupported")
+	addr := os.Getenv("MKENV_ADDR")
+	if addr == "" {
+		return nil, errors.New("MKENV_ADDR missing")
 	}
+	raw, err := transport.DialTCP(ctx, addr, 200, 50*time.Millisecond)
+	if err != nil {
+		return nil, err
+	}
+	cc := protocol.NewControlConn(raw)
+	return &ControlClient{conn: cc}, nil
 }
 
 func (c *ControlClient) Close() error {

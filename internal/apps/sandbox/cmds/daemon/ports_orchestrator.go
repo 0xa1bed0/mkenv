@@ -107,7 +107,7 @@ func newPortsOrchestrator(rt *runtime.Runtime) *portsOrchestrator {
 func (po *portsOrchestrator) StartPrebindLoop() {
 	ctx := po.rt.Ctx()
 
-	po.rt.Go(func() {
+	po.rt.GoNamed("PrebindLoop", func() {
 		// TODO: make configurable
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
@@ -143,7 +143,7 @@ func (po *portsOrchestrator) StartPrebindLoop() {
 
 func (po *portsOrchestrator) StartProxy() {
 	ctx := po.rt.Ctx()
-	po.rt.Go(func() {
+	po.rt.GoNamed("Proxy", func() {
 		proxy := sandbox.NewProxyServer(po.rt)
 		if err := proxy.Run(ctx); err != nil {
 			logs.Errorf("proxy error: %v", err)
@@ -156,7 +156,7 @@ func (po *portsOrchestrator) StartProxy() {
 func (po *portsOrchestrator) StartSnapshotReporter() {
 	ctx := po.rt.Ctx()
 
-	po.rt.Go(func() {
+	po.rt.GoNamed("SnaphostReporter", func() {
 		// TODO: make configurable
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()

@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -9,43 +10,50 @@ import (
 	"github.com/0xa1bed0/mkenv/internal/runtime"
 )
 
-// TCPServer represents a running TCP listener with a done channel.
-type TCPServer struct {
-	Listener net.Listener
-	Done     <-chan struct{}
-}
-
 // ServeTCP listens on addr and calls onConn for each accepted connection.
 // Closing the Listener will stop the loop and close Done.
-func ServeTCP(rt *runtime.Runtime, addr string, onConn func(net.Conn)) (*TCPServer, error) {
+func ServeTCP(rt *runtime.Runtime, addr string, onConn func(context.Context, net.Conn)) (*Server, error) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
 
-	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(rt.Ctx())
 
-	rt.Go(func() {
-		defer close(done)
-		logs.Debugf("tcp protocol. start accepting connections")
+	go func() {
+		<-ctx.Done()
+		ln.Close()
+	}()
+
+	routineName := fmt.Sprintf("ServeTCP;Accept loop;%s;", addr)
+	rt.GoNamed(routineName, func() {
+		logs.Infof("tcp protocol. start accepting connections")
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
 				// this should be normal because we close connection concurently somewhere,
 				// so there is a huge chance we accept on closed connection. We will log it just in case and exit
-				logs.Debugf("tcp protocol: err while accept: %v", err)
+				if ctx.Err() != nil {
+					// context canceled; listener closed intentionally
+					logs.Infof("accept loop stopped due to context: %v", err)
+				} else {
+					logs.Infof("accept error: %v", err)
+				}
 				return
 			}
-			logs.Debugf("tcp protocol: handling connection")
-			rt.Go(func() {
-				onConn(conn)
+
+			logs.Infof("tcp protocol: handling connection")
+
+			rt.GoNamed(routineName+"onConn", func() {
+				logs.Infof("Transport: call onConn")
+				onConn(ctx, conn)
 			})
 		}
 	})
 
-	return &TCPServer{
+	return &Server{
 		Listener: ln,
-		Done:     done,
+		Cancel:   cancel,
 	}, nil
 }
 

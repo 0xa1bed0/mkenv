@@ -48,7 +48,7 @@ func NewContainerOrchestrator(rt *runtime.Runtime, binds []string, dockerClient 
 }
 
 func (co *ContainerOrchestrator) Start() error {
-	co.rt.Go(func() {
+	co.rt.GoNamed("ContainerOrchestrator;startEnv", func() {
 		co.startEnv()
 	})
 
@@ -87,7 +87,7 @@ func (co *ContainerOrchestrator) startEnv() {
 	co.rt.Container().SetPort(containerPortRessservation.Port)
 
 	errChan := make(chan error, 1)
-	co.rt.Go(func() {
+	co.rt.GoNamed("RunContainer", func() {
 		err := co.dockerClient.RunContainer(containerCtx, co.rt.Project().Name(), containerID, containerPortRessservation.Claim, co.rt.Term())
 		errChan <- err
 	})

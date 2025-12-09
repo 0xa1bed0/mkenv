@@ -171,8 +171,14 @@ func (rt *Runtime) ResolveProject(ctx context.Context, path string, kvStore *sta
 //   - If fn panics, the panic is recovered, wrapped into an error, recorded,
 //     and the context is cancelled.
 //   - Runtime.Wait() will wait for all such goroutines and return the first error.
-func (rt *Runtime) Go(fn func()) {
+func (rt *Runtime) GoNamed(name string, fn func()) {
+	if name == "" {
+		name = "annonymous"
+	}
 	rt.wg.Go(func() {
+		if name != "ControlServer:DispatchEnvelope" {
+			logs.Infof("%s goroutine start", name)
+		}
 		defer func() {
 			// recover panic
 			if r := recover(); r != nil {
@@ -188,6 +194,9 @@ func (rt *Runtime) Go(fn func()) {
 		}()
 
 		fn()
+		if name != "ControlServer:DispatchEnvelope" {
+			logs.Infof("%s goroutine finish", name)
+		}
 	})
 }
 
@@ -200,7 +209,7 @@ func (rt *Runtime) Wait() error {
 }
 
 func (rt *Runtime) OnShutdown(fn func(ctx context.Context)) {
-	rt.Go(func() {
+	rt.GoNamed("OnShutdown", func() {
 		// wait until runtime context is cancelled
 		<-rt.ctx.Done()
 
