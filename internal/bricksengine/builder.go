@@ -1,6 +1,7 @@
 package bricksengine
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -176,13 +177,18 @@ func WithFileTemplates(fileTemplates []FileTemplate) BrickOption {
 	}
 }
 
-func WithEntrypoint(entrypoint []string) BrickOption {
+func WithEntrypoint(entrypoint []string, attachInstruction []string) BrickOption {
 	return func(bi *brick) error {
 		if len(bi.entrypoint) > 0 {
 			return fmt.Errorf("[brick %s] Entrypoint already defined. Cannot override", bi.id)
 		}
 
+		if len(attachInstruction) == 0 {
+			return errors.New("Attach instruction should not be empty")
+		}
+
 		bi.entrypoint = copyStrings(entrypoint)
+		bi.attachInstruction = copyStrings(attachInstruction)
 
 		return nil
 	}
@@ -217,7 +223,7 @@ func WithBrick(b Brick) BrickOption {
 		WithRootRuns(b.RootRun())(bi)
 		WithUserRuns(b.UserRun())(bi)
 		WithFileTemplates(b.FileTemplates())(bi)
-		WithEntrypoint(b.Entrypoint())(bi)
+		WithEntrypoint(b.Entrypoint(), b.AttachInstruction())(bi)
 		WithCmd(b.Cmd())(bi)
 		WithCacheFolders(b.CacheFolders())(bi)
 

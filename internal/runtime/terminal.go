@@ -81,6 +81,16 @@ func (g *TerminalGuard) EnterRawAndWatch(onResize func(width, height uint)) erro
 	return nil
 }
 
+func (g *TerminalGuard) Size() (width uint, height uint, err error) {
+	ws, err := term.GetWinsize(g.inFd)
+	if err != nil {
+		return
+	}
+	width = uint(ws.Width)
+	height = uint(ws.Height)
+	return
+}
+
 // Restore resets the terminal to its previous state and stops resize watching.
 // Safe to call multiple times.
 func (g *TerminalGuard) Restore() {

@@ -3,57 +3,91 @@ package mkenv
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/0xa1bed0/mkenv/internal/dockerclient"
+	"github.com/0xa1bed0/mkenv/internal/logs"
+	"github.com/0xa1bed0/mkenv/internal/runtime"
+	"github.com/0xa1bed0/mkenv/internal/ui"
 	"github.com/spf13/cobra"
 )
 
 func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list [PATH]",
-		Short: "List dev containers for this project (or all)",
-		Long:  "List running / known mkenv containers. If PATH is given, filter by that project.",
-		Args:  cobra.MaximumNArgs(1),
+		Use:     "list [PATH]",
+		Aliases: []string{"ls"},
+		Short:   "List dev containers for project.",
+		Long:    "List running / known mkenv containers. If PATH is given, filter by that project.",
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var path string
+			logs.Debugf("running list...")
+
+			rt := runtime.FromContext(cmd.Context())
+
+			pathArg := "."
 			if len(args) == 1 {
-				path = args[0]
+				pathArg = args[0]
 			} else {
 				pwd, err := os.Getwd()
 				if err != nil {
 					return err
 				}
-				path = pwd
+				pathArg = pwd
 			}
 
-			// TODO: query Docker for containers labeled 'mkenv=1', maybe by project label
-			containers := []ContainerInfo{
-				// fake data for now
-				{ID: "abc123", Name: "mkenv-myproj-abc123", Status: "running"},
-				{ID: "def456", Name: "mkenv-myproj-def456", Status: "exited"},
-				{ID: "def458", Name: "mkenv-myproj-def458", Status: "exited"},
-				{ID: "def459", Name: "mkenv-myproj-def459", Status: "exited"},
-				{ID: "def455", Name: "mkenv-myproj-def455", Status: "exited"},
+			signalsCtx, stopSignalsCtx := signal.NotifyContext(rt.Ctx(), os.Interrupt, syscall.SIGTERM)
+			defer stopSignalsCtx()
+
+			dockerClient, err := dockerclient.DefaultDockerClient()
+			if err != nil {
+				return err
+			}
+
+			var containers []*dockerclient.MkenvContainerInfo
+
+			if len(args) == 0 {
+				containers, err = dockerClient.ListAllContainer(signalsCtx, false)
+				if err != nil {
+					return err
+				}
+			} else {
+				var project *runtime.Project
+				project, err = rt.ResolveProject(signalsCtx, pathArg, nil)
+				if err != nil {
+					return err
+				}
+
+				containers, err = dockerClient.ListContainers(signalsCtx, project, false)
+				if err != nil {
+					return err
+				}
 			}
 
 			if len(containers) == 0 {
-				fmt.Println("No mkenv containers found for", path)
+				fmt.Println("No containers found")
 				return nil
 			}
 
-			// If you just want to print:
-			for _, c := range containers {
-				fmt.Printf("%s  %s  (%s)\n", c.ID, c.Name, c.Status)
+			colums := []ui.Column{
+				{Header: "Project"},
+				{Header: "Name"},
+				{Header: "State"},
+				{Header: "Status"},
+				{Header: "Created"},
+				{Header: "Command"},
 			}
 
-			// Optional: interactive pick when there are multiple
-			if len(containers) > 1 {
-				// chosen, err := ui.SelectOne("Select container to inspect:", containers)
-				// if err != nil {
-				// 	return err
-				// }
-				// fmt.Printf("\nSelected: %s (%s)\n", chosen.Name, chosen.ID)
-				// Could show more details, logs, etc.
+			table := ui.NewTable(colums...)
+
+			for _, container := range containers {
+				table.AddRow(container.Project, container.Name, container.State, container.Status, container.Created, container.Command)
 			}
+
+			fmt.Println("")
+			table.Render(os.Stdout)
+			fmt.Println("")
+			fmt.Println("Use 'mkenv a [name]' to attach or 'mkenv rm [name]' to remove")
 
 			return nil
 		},

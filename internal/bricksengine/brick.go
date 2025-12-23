@@ -28,6 +28,7 @@ type Brick interface {
 	CacheFolders() CacheFoldersPaths
 
 	Entrypoint() []string
+	AttachInstruction() []string
 	Cmd() []string
 }
 
@@ -79,8 +80,9 @@ type brick struct {
 
 	cacheFolders CacheFoldersPaths
 
-	entrypoint []string
-	cmd        []string
+	entrypoint        []string
+	cmd               []string
+	attachInstruction []string
 }
 
 func (b *brick) BaseImage() string       { return b.baseImage }
@@ -98,6 +100,7 @@ func (b *brick) PackageRequests() []PackageRequest {
 func (b *brick) CacheFolders() CacheFoldersPaths { return copyStrings(b.cacheFolders) }
 func (b *brick) PackageManager() PackageManager  { return b.packageManager }
 func (b *brick) Entrypoint() []string            { return copyStrings(b.entrypoint) }
+func (b *brick) AttachInstruction() []string     { return copyStrings(b.attachInstruction) }
 func (b *brick) Cmd() []string                   { return copyStrings(b.cmd) }
 
 // Safe-copy helpers

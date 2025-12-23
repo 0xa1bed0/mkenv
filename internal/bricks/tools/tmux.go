@@ -16,7 +16,7 @@ func NewTmux(map[string]string) (bricksengine.Brick, error) {
 				{Name: "tmux"},
 			},
 		}),
-		bricksengine.WithEntrypoint([]string{"/usr/bin/tmux", "-u"}),
+		bricksengine.WithEntrypoint([]string{"/usr/bin/tmux", "-u"}, []string{"tmux", "a"}),
 		// TODO: make it user config (extraSteps???) - consider security checks -- or make brick with tmux plugins ???
 		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",

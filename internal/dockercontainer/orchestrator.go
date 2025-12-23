@@ -97,8 +97,10 @@ func (co *ContainerOrchestrator) startEnv() {
 		exitSignal := OrchestratorExitSignal{}
 		if err != nil {
 			exitSignal.Err = err
+			logs.Debugf("Container exited with error: %v", err)
+		} else {
+			logs.Debugf("Container exited")
 		}
-		logs.Debugf("Container existed. error: %v", err)
 		co.exitCh <- exitSignal
 
 	case <-containerCtx.Done():

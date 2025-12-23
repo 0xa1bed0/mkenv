@@ -33,6 +33,8 @@ type BuildPlan struct {
 	entrypoint []string
 	cmd        []string
 
+	attachInstruction []string
+
 	cachePaths []string
 
 	order []bricksengine.BrickID // for audit
@@ -156,6 +158,7 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 
 	if p.entrypointBrick != nil {
 		plan.entrypoint = p.entrypointBrick.Entrypoint()
+		plan.attachInstruction = p.entrypointBrick.AttachInstruction()
 		plan.cmd = p.entrypointBrick.Cmd()
 		p.bricks[p.entrypointBrick.ID()] = p.entrypointBrick
 	}

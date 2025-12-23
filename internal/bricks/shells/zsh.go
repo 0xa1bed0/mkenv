@@ -32,7 +32,7 @@ func NewZsh(metadata map[string]string) (bricksengine.Brick, error) {
 			FilePath: "${MKENV_HOME}/.zshrc",
 			Content:  `[ -s "${MKENV_HOME}/.mkenvrc" ] && . "${MKENV_HOME}/.mkenvrc"`,
 		}),
-		bricksengine.WithEntrypoint([]string{"/usr/bin/zsh"}),
+		bricksengine.WithEntrypoint([]string{"/usr/bin/zsh"}, []string{"zsh"}),
 	)
 	if err != nil {
 		return nil, err

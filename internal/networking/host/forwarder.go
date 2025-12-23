@@ -25,7 +25,7 @@ type Forwarder struct {
 }
 
 func (f *Forwarder) Start(rt *runtime.Runtime) error {
-	addr := fmt.Sprintf("127.0.0.1:%d", f.TargetPort)
+	addr := fmt.Sprintf("0.0.0.0:%d", f.TargetPort)
 
 	server, err := transport.ServeTCP(rt, addr, func(servctx context.Context, conn net.Conn) {
 		logs.Infof("[mkenv host] forwarder accepted client on %d from %s", f.TargetPort, conn.RemoteAddr())
@@ -44,7 +44,9 @@ func (f *Forwarder) Stop() {
 	logs.Debugf("Try stop forwarder server")
 	f.once.Do(func() {
 		logs.Debugf("Stopping forwarder server")
-		f.srv.Cancel()
+		if f.srv != nil {
+			f.srv.Cancel()
+		}
 	})
 }
 

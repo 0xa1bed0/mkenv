@@ -2,10 +2,12 @@ package dockerclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
@@ -19,6 +21,97 @@ const (
 	shortLen         = 6       // length of the hash-like suffix
 	tailMarker       = "tail-" // visible indicator that we trimmed the left side
 )
+
+func (dc *DockerClient) AttachToRunning(ctx context.Context, containerID string, term *runtime.TerminalGuard) error {
+	cont, err := dc.client.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return err
+	}
+
+	if !cont.State.Running {
+		return errors.New("can't attach to non running container")
+	}
+
+	attachCmd := strings.Split(cont.Config.Labels["mkenv.attachInstruction"], "|MKENVSEP|")
+
+	// Create an exec session that attaches/creates tmux
+	// (swap bash/sh/zsh as you prefer)
+	execResp, err := dc.client.ContainerExecCreate(ctx, containerID, container.ExecOptions{
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+		Cmd:          attachCmd,
+	})
+	if err != nil {
+		return fmt.Errorf("exec create: %w", err)
+	}
+
+	hijack, err := dc.client.ContainerExecAttach(ctx, execResp.ID, container.ExecAttachOptions{Tty: true})
+	if err != nil {
+		return fmt.Errorf("exec attach: %w", err)
+	}
+	defer hijack.Close()
+
+	restoreLogs := logs.Mute()
+	defer restoreLogs()
+
+	// 3) Enter raw + resize EXEC on start + on every window change
+	err = term.EnterRawAndWatch(func(width, height uint) {
+		_ = dc.client.ContainerExecResize(ctx, execResp.ID, container.ResizeOptions{
+			Height: height,
+			Width:  width,
+		})
+	})
+	if err != nil {
+		return err
+	}
+	defer term.Restore()
+
+	// Optional but recommended: force one resize immediately (some watchers only fire on change)
+	w, h, err := term.Size() // if you have this; otherwise call your terminal size getter
+	if err != nil {
+		return err
+	}
+	_ = dc.client.ContainerExecResize(ctx, execResp.ID, container.ResizeOptions{Width: w, Height: h})
+
+	// IMPORTANT: start stdout pump immediately
+	outErr := make(chan error, 1)
+	go func() {
+		_, e := io.Copy(os.Stdout, hijack.Reader) // TTY=true => raw stream (no stdcopy)
+		outErr <- e
+	}()
+
+	// stdin -> container
+	inErr := make(chan error, 1)
+	go func() {
+		_, e := io.Copy(hijack.Conn, os.Stdin)
+		inErr <- e
+	}()
+
+	// Wait for session end / cancel.
+	// (Exec session ends when tmux detach/exit happens; container can keep running.)
+	select {
+	case <-ctx.Done():
+		hijack.Close()
+		return nil
+
+	case e := <-outErr:
+		hijack.Close()
+		// io.Copy often returns nil/EOF when session closes — treat as normal.
+		if e != nil && !errors.Is(e, io.EOF) {
+			return fmt.Errorf("stdout copy: %w", e)
+		}
+		return nil
+
+	case e := <-inErr:
+		hijack.Close()
+		if e != nil && !errors.Is(e, io.EOF) {
+			return fmt.Errorf("stdin copy: %w", e)
+		}
+		return nil
+	}
+}
 
 // RunContainer emulates:
 //
@@ -55,17 +148,16 @@ func (dc *DockerClient) RunContainer(ctx context.Context, projectName, container
 	restoreLogs := logs.Mute()
 	defer restoreLogs()
 
-	// --- TTY handling via Guard ---
-	if err := term.EnterRawAndWatch(func(width, height uint) {
+	err = term.EnterRawAndWatch(func(width, height uint) {
 		_ = dc.client.ContainerResize(ctx, containerID, container.ResizeOptions{
 			Height: height,
 			Width:  width,
 		})
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 	defer term.Restore()
-	// ------------------------------
 
 	// Let Ctrl+C go *into* tmux/zsh; only treat SIGTERM as "kill from outside".
 	stopCh := make(chan os.Signal, 1)
@@ -97,28 +189,43 @@ func (dc *DockerClient) RunContainer(ctx context.Context, projectName, container
 	select {
 	case <-ctx.Done():
 		attach.Close()
+		logs.Debugf("ctx.Done() called")
 		if err := dc.KillContainer(containerID); err != nil {
 			logs.Errorf("can't kill container: error: %v", err)
 			return err
 		}
 	case err := <-errCh:
 		attach.Close()
+		logs.Debugf("err chan triggered")
 		if err != nil {
 			return fmt.Errorf("container wait: %w", err)
+		}
+		if err := dc.KillContainer(containerID); err != nil {
+			logs.Errorf("can't kill container: error: %v", err)
+			return err
 		}
 		return nil
 	case st := <-statusCh:
 		attach.Close()
 		logs.Debugf("Container exited normally: %v", st)
+		err := dc.client.ContainerRemove(context.Background(), containerID, container.RemoveOptions{RemoveVolumes: false, Force: true})
+		if err != nil {
+			logs.Errorf("can't remove container %s: %v", containerID, err)
+		}
 		return nil
 	}
 
+	logs.Debugf("wtf?")
 	return nil
 }
 
 func (dc *DockerClient) KillContainer(containerID string) error {
 	// TODO: close attach
-	return dc.client.ContainerKill(context.Background(), containerID, "SIGTERM")
+	err := dc.client.ContainerKill(context.Background(), containerID, "SIGTERM")
+	if err != nil {
+		return err
+	}
+	return dc.client.ContainerRemove(context.Background(), containerID, container.RemoveOptions{RemoveVolumes: false, Force: true})
 }
 
 func (dc *DockerClient) startSandboxDaemon(ctx context.Context, projectName, containerID string) error {

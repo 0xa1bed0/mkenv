@@ -112,6 +112,7 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 		lines = append(lines, "", "# ───────────────────────────────────────────")
 		lines = append(lines, "# ENTRYPOINT (exec form)")
 		lines = append(lines, "ENTRYPOINT "+jsonExec(plan.entrypoint, plan.args))
+		lines = append(lines, fmt.Sprintf("LABEL mkenv.attachInstruction=%s", strings.Join(plan.attachInstruction, "|MKENVSEP|")))
 	}
 	if len(plan.cmd) > 0 {
 		lines = append(lines, "", "# CMD (exec form)")
@@ -129,6 +130,8 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 	if len(cacheFoldersPaths) > 0 {
 		lines = append(lines, fmt.Sprintf("LABEL mkenv_cache_volumes=\"%s\"", strings.Join(cacheFoldersPaths, ",")))
 	}
+
+	lines = append(lines, "LABEL mkenv=true")
 
 	return lines
 }

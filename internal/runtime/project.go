@@ -31,7 +31,7 @@ func (st *projectStateDB) deriveKey(path string) state.KVStoreKey {
 
 func (st *projectStateDB) isKnownPath(ctx context.Context, path string) bool {
 	if st.kvStore == nil {
-		logs.Warnf("[projectState:isKnownPath] can't determine if this project known because no state provided. Assuming is not know")
+		logs.Debugf("[projectState:isKnownPath] can't determine if this project known because no state provided. Assuming is not know")
 		return false
 	}
 

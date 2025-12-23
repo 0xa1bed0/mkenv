@@ -30,7 +30,7 @@ func (dc *DockerClient) resolveCacheVolumes(ctx context.Context, imageTag string
 	}
 
 	args := filters.NewArgs()
-	args.Add("label", "mkenv_project="+project.Name())
+	args.Add("label", "mkenv.project="+project.Name())
 	existingVolumes, err := dc.client.VolumeList(ctx, volume.ListOptions{
 		Filters: args,
 	})
@@ -58,7 +58,7 @@ func (dc *DockerClient) resolveCacheVolumes(ctx context.Context, imageTag string
 			Driver: "local",
 			Labels: map[string]string{
 				"mkenv":            "1",
-				"mkenv_project":    project.Name(),
+				"mkenv.project":    project.Name(),
 				"mkenv_mount_path": path,
 			},
 		})

@@ -20,9 +20,11 @@ func NewDebian(metadata map[string]string) (bricksengine.Brick, error) {
 		bricksengine.WithPackageRequest(bricksengine.PackageRequest{
 			Reason: "Convinience tools",
 			Packages: []bricksengine.PackageSpec{
+				{Name: "procps"},
 				{Name: "fzf"},
 				{Name: "ripgrep"},
 				{Name: "htop"},
+				{Name: "openssh-client"},
 				{Name: "netcat-traditional"}, // TODO: remove it
 			},
 		}),
@@ -39,7 +41,6 @@ func NewDebian(metadata map[string]string) (bricksengine.Brick, error) {
 export PATH="$PATH:$MKENV_LOCAL_BIN"`,
 		}),
 	)
-
 	if err != nil {
 		return nil, err
 	}

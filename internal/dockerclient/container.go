@@ -4,17 +4,100 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
 	"github.com/0xa1bed0/mkenv/internal/networking/host"
 	"github.com/0xa1bed0/mkenv/internal/runtime"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/go-connections/nat"
 )
+
+type MkenvContainerInfo struct {
+	ContainerID string
+	Name        string
+	State       string
+	Status      string
+	Created     string
+	Command     string
+	Project     string
+}
+
+func (ci *MkenvContainerInfo) OptionLabel() string {
+	return fmt.Sprintf("%s - %s (created at: %s)", ci.Project, ci.Name, ci.Created)
+}
+
+func (ci *MkenvContainerInfo) OptionID() string {
+	return ci.ContainerID
+}
+
+func (dc *DockerClient) ListAllContainer(ctx context.Context, runningOnly bool) ([]*MkenvContainerInfo, error) {
+	args := filters.NewArgs()
+	args.Add("label", "mkenv=true")
+	result, err := dc.client.ContainerList(ctx, container.ListOptions{
+		Filters: args,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out := []*MkenvContainerInfo{}
+
+	for _, container := range result {
+		if runningOnly && container.State != "running" {
+			continue
+		}
+		created := time.Unix(container.Created, 0).Local().Format(time.RFC1123Z)
+		out = append(out, &MkenvContainerInfo{
+			ContainerID: container.ID,
+			Name:        strings.Join(container.Names, ","),
+			State:       container.State,
+			Status:      container.Status,
+			Created:     created,
+			Command:     container.Command,
+			Project:     container.Labels["mkenv.project"],
+		})
+	}
+
+	return out, nil
+}
+
+func (dc *DockerClient) ListContainers(ctx context.Context, project *runtime.Project, runningOnly bool) ([]*MkenvContainerInfo, error) {
+	args := filters.NewArgs()
+	args.Add("label", "mkenv.project="+project.Name())
+	result, err := dc.client.ContainerList(ctx, container.ListOptions{
+		Filters: args,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out := []*MkenvContainerInfo{}
+
+	for _, container := range result {
+		if runningOnly && container.State != "running" {
+			continue
+		}
+		created := time.Unix(container.Created, 0).Local().Format(time.RFC1123Z)
+		out = append(out, &MkenvContainerInfo{
+			ContainerID: container.ID,
+			Name:        strings.Join(container.Names, ","),
+			State:       container.State,
+			Status:      container.Status,
+			Created:     created,
+			Command:     container.Command,
+			Project:     project.Name(),
+		})
+	}
+
+	return out, nil
+}
 
 func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Project, imageTag string, envs, binds []string) (containerID string, containerPortReservation *host.PortReservation, err error) {
 	cfg := &container.Config{
@@ -28,6 +111,9 @@ func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Pr
 		AttachStdin:  true,
 		AttachStdout: true,
 		AttachStderr: true,
+		Labels: map[string]string{
+			"mkenv.project": project.Name(),
+		},
 	}
 
 	containerPortReservation = host.ReserveFreeTCPPort()
@@ -66,15 +152,6 @@ func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Pr
 		return
 	}
 	containerID = created.ID
-
-	go func() {
-		<-ctx.Done()
-		_ = dc.client.ContainerRemove(context.Background(), containerID, container.RemoveOptions{
-			Force: true,
-			// TODO: this should be an option. Becccause sometimes we want absolute disposable container.  maybe we just need to disable caching (disable cache volumes resolution)
-			RemoveVolumes: false,
-		})
-	}()
 
 	return
 }
