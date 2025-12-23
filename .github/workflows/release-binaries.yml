@@ -1,0 +1,79 @@
+name: Build and release darwin arm64 binary
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build darwin arm64 binary
+        run: |
+          make host TARGET_OS=darwin TARGET_ARCH=arm64
+          cp dist/darwin-arm64/mkenv dist/mkenv-darwin-arm64
+          sha256sum dist/mkenv-darwin-arm64 > dist/mkenv-darwin-arm64.sha256
+          cp dist/mkenv-darwin-arm64.sha256 dist/checksums.txt
+
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Validate tag is semver
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          SEMVER_RE='^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$'
+          if [[ ! "$TAG" =~ $SEMVER_RE ]]; then
+            echo "Tag '$TAG' is not valid semver (optionally prefixed with v)."
+            exit 1
+          fi
+
+      - name: Release semver tag
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "$TAG" --notes ""
+          gh release upload "$TAG" dist/mkenv-darwin-arm64 dist/mkenv-darwin-arm64.sha256 dist/checksums.txt --clobber
+
+      - name: Update latest alias
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git tag -f latest "$GITHUB_SHA"
+          git push -f origin latest
+          gh release view latest >/dev/null 2>&1 || \
+            gh release create latest --title latest --notes "Latest stable release."
+          gh release upload latest dist/mkenv-darwin-arm64 dist/mkenv-darwin-arm64.sha256 dist/checksums.txt --clobber
+
+      - name: Update development alias
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git tag -f development "$GITHUB_SHA"
+          git push -f origin development
+          gh release view development >/dev/null 2>&1 || \
+            gh release create development --title development --notes "Latest development build from main/master."
+          gh release upload development dist/mkenv-darwin-arm64 dist/mkenv-darwin-arm64.sha256 dist/checksums.txt --clobber

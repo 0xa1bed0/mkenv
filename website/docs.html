@@ -11,6 +11,7 @@
     <div class="logo"><a href="index.html">mkenv.sh</a></div>
     <nav>
         <a href="#overview">Overview</a>
+        <a href="#downloads">Downloads</a>
         <a href="#installation">Installation</a>
         <a href="#quickstart">Quickstart</a>
         <a href="#commands">Commands</a>
@@ -26,6 +27,25 @@
         <p>This documentation assumes you already live inside a terminal, know Docker basics, and understand that trusting random repos is a losing bet. We cover how to install, run, and bend mkenv without touching YAML.</p>
     </section>
 
+    <section id="downloads">
+        <h2>Downloads</h2>
+        <p>Stable builds with checksum lists. For a specific version, use a semver tag like <code>vX.Y.Z</code>.</p>
+        <div class="download-grid">
+            <div class="download-card">
+                <h3>Latest Stable (macOS arm64)</h3>
+                <p>Recommended for most users.</p>
+                <a class="download-button primary" href="https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64" target="_blank">Download binary</a>
+                <a class="download-button" href="https://github.com/0xa1bed0/mkenv/releases/download/latest/checksums.txt" target="_blank">Checksums</a>
+            </div>
+            <div class="download-card">
+                <h3>Semver Releases</h3>
+                <p>Stable versions by tag.</p>
+                <a class="download-button" href="https://github.com/0xa1bed0/mkenv/releases" target="_blank">Release list</a>
+                <p><code>/releases/download/vX.Y.Z/mkenv-darwin-arm64</code></p>
+            </div>
+        </div>
+    </section>
+
     <section id="installation">
         <h2>Installation</h2>
         <div class="note">Platform: macOS only right now. Linux is on the radar, Windows likely via WSL later. Bring Docker Desktop or equivalent.</div>
@@ -39,9 +59,12 @@
         <ol>
             <li>Grab the latest darwin-arm64 binary from GitHub Releases:</li>
         </ol>
-        <pre><code>curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64 -o mkenv
-chmod +x mkenv
-sudo mv mkenv /usr/local/bin/</code></pre>
+        <pre><code>curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64 -o mkenv-darwin-arm64
+curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64.sha256 -o mkenv-darwin-arm64.sha256
+shasum -a 256 -c mkenv-darwin-arm64.sha256
+chmod +x mkenv-darwin-arm64
+sudo mv mkenv-darwin-arm64 /usr/local/bin/mkenv</code></pre>
+        <p>Specific versions use <code>/releases/download/vX.Y.Z/</code>.</p>
         <ol start="2">
             <li>Confirm it's on your PATH:</li>
         </ol>

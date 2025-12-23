@@ -87,6 +87,33 @@ ul {
     background: #0c2c58;
     color: #fff;
 }
+.download-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+.download-card {
+    border: 1px solid #9ca3b8;
+    background: #f9f9f9;
+    padding: 12px;
+    font-size: 14px;
+}
+.download-button {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 6px 12px;
+    border: 1px solid #0c2c58;
+    background: #e7ebf9;
+    color: #0c2c58;
+    font-weight: bold;
+    font-size: 13px;
+    text-decoration: none;
+}
+.download-button.primary {
+    background: #0c2c58;
+    color: #fff;
+}
 .problem-block {
     border: 1px solid #b64b4b;
     background: #fff4f2;

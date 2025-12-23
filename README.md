@@ -25,6 +25,16 @@
 
 ---
 
+## ⚡ Quickstart
+
+```sh
+curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64 -o mkenv-darwin-arm64
+curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64.sha256 -o mkenv-darwin-arm64.sha256
+shasum -a 256 -c mkenv-darwin-arm64.sha256
+chmod +x mkenv-darwin-arm64
+./mkenv-darwin-arm64 .
+```
+
 ## 🚀 Key Features
 
 ### **Zero‑Config Environment Detection (the core feature)**
@@ -328,9 +338,26 @@ We make them reachable.
 
 Coming soon — Homebrew formula & direct binary downloads.
 
-For now - navigate to the Github Releases page and download the pre-build binary
+For now, download the latest darwin-arm64 binary:
 
-or install it from source:
+```sh
+curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64 -o mkenv-darwin-arm64
+curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64.sha256 -o mkenv-darwin-arm64.sha256
+shasum -a 256 -c mkenv-darwin-arm64.sha256
+chmod +x mkenv-darwin-arm64
+sudo mv mkenv-darwin-arm64 /usr/local/bin/mkenv
+```
+
+Need the **development** build instead?
+`https://github.com/0xa1bed0/mkenv/releases/download/development/mkenv-darwin-arm64`
+
+Want a **specific version**?
+`https://github.com/0xa1bed0/mkenv/releases/download/vX.Y.Z/mkenv-darwin-arm64`
+
+Checksums for all available artifacts are also published as:
+`https://github.com/0xa1bed0/mkenv/releases/download/latest/checksums.txt`
+
+Or install it from source:
 
 ```
 go install github.com/0xa1bed0/mkenv@latest
@@ -394,4 +421,3 @@ mkenv is **free for all real-world usage**, including organizational usage.
 - Offer mkenv as a hosted/managed service (SaaS)  
 - Embed mkenv into a commercial product  
 - Build or sell a commercial competitor based on mkenv  
-
