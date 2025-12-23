@@ -26,7 +26,7 @@ jobs:
 
       - name: Build darwin arm64 binary
         run: |
-          make host TARGET_OS=darwin TARGET_ARCH=arm64
+          make 
           cp dist/darwin-arm64/mkenv dist/mkenv-darwin-arm64
           sha256sum dist/mkenv-darwin-arm64 > dist/mkenv-darwin-arm64.sha256
           cp dist/mkenv-darwin-arm64.sha256 dist/checksums.txt
