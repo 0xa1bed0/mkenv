@@ -188,6 +188,12 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 		plan.processBrick(brick)
 	}
 
+	plan.packages = uniquePackages(plan.packages)
+	plan.rootRun = uniqueCommands(plan.rootRun)
+	plan.userRun = uniqueCommands(plan.userRun)
+	plan.fileTemplates = uniqueFileTemplates(plan.fileTemplates)
+	plan.cachePaths = uniqueStrings(plan.cachePaths)
+
 	plan.expandPackages()
 
 	return plan, nil
@@ -374,4 +380,91 @@ func (p *planner) estimateBricks(ctx context.Context) error {
 
 func mentionsAny(id bricksengine.BrickID, en, dis map[bricksengine.BrickID]bool) bool {
 	return en[id] || dis[id]
+}
+
+func uniquePackages(specs []bricksengine.PackageSpec) []bricksengine.PackageSpec {
+	if len(specs) == 0 {
+		return specs
+	}
+	seen := make(map[string]struct{}, len(specs))
+	out := make([]bricksengine.PackageSpec, 0, len(specs))
+	for _, spec := range specs {
+		key := packageKey(spec)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, spec)
+	}
+	return out
+}
+
+func packageKey(spec bricksengine.PackageSpec) string {
+	if len(spec.Meta) == 0 {
+		return spec.Name
+	}
+	keys := make([]string, 0, len(spec.Meta))
+	for k := range spec.Meta {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	b.WriteString(spec.Name)
+	for _, k := range keys {
+		b.WriteString("\x1f")
+		b.WriteString(k)
+		b.WriteString("=")
+		b.WriteString(spec.Meta[k])
+	}
+	return b.String()
+}
+
+func uniqueCommands(cmds []bricksengine.Command) []bricksengine.Command {
+	if len(cmds) == 0 {
+		return cmds
+	}
+	seen := make(map[string]struct{}, len(cmds))
+	out := make([]bricksengine.Command, 0, len(cmds))
+	for _, cmd := range cmds {
+		key := cmd.When + "\x1f" + strings.Join(cmd.Argv, "\x1f")
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, cmd)
+	}
+	return out
+}
+
+func uniqueFileTemplates(templates []bricksengine.FileTemplate) []bricksengine.FileTemplate {
+	if len(templates) == 0 {
+		return templates
+	}
+	seen := make(map[string]struct{}, len(templates))
+	out := make([]bricksengine.FileTemplate, 0, len(templates))
+	for _, tmpl := range templates {
+		key := tmpl.ID + "\x1f" + tmpl.FilePath + "\x1f" + tmpl.Content
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, tmpl)
+	}
+	return out
+}
+
+func uniqueStrings(values []string) []string {
+	if len(values) == 0 {
+		return values
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
 }
