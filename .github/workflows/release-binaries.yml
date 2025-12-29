@@ -22,18 +22,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+      
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
-
+      
       - name: Configure git user
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
+      
       - name: Validate tag is semver
         if: startsWith(github.ref, 'refs/tags/')
         run: |
@@ -43,21 +43,37 @@ jobs:
             echo "Tag '$TAG' is not valid semver (optionally prefixed with v)."
             exit 1
           fi
-
+      
       - name: Set version
         id: version
         run: |
           echo "version=${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'dev' }}" >> $GITHUB_OUTPUT
-
+      
       - name: Build darwin arm64 binary
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           echo building $VERSION binary...
-          make VERSION=$VERSION
+          make VERSION=$VERSION TARGET_OS=darwin TARGET_ARCH=arm64
           cp dist/darwin-arm64/mkenv dist/mkenv-darwin-arm64
           sha256sum dist/mkenv-darwin-arm64 > dist/mkenv-darwin-arm64.sha256
-          cp dist/mkenv-darwin-arm64.sha256 dist/checksums.txt
-
+      
+      # NEW: Build darwin amd64 for Homebrew Intel Mac support
+      - name: Build darwin amd64 binary
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          make VERSION=$VERSION TARGET_OS=darwin TARGET_ARCH=amd64
+          cp dist/darwin-amd64/mkenv dist/mkenv-darwin-amd64
+          sha256sum dist/mkenv-darwin-amd64 > dist/mkenv-darwin-amd64.sha256
+      
+      # NEW: Create combined checksums file
+      - name: Create checksums file
+        run: |
+          cat dist/mkenv-darwin-arm64.sha256 > dist/checksums.txt
+          if [ -f dist/mkenv-darwin-amd64.sha256 ]; then
+            cat dist/mkenv-darwin-amd64.sha256 >> dist/checksums.txt
+          fi
+      
       - name: Release semver tag
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -66,8 +82,13 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           gh release view "$TAG" >/dev/null 2>&1 || \
             gh release create "$TAG" --title "$TAG" --notes ""
-          gh release upload "$TAG" dist/mkenv-darwin-arm64 dist/mkenv-darwin-arm64.sha256 dist/checksums.txt --clobber
-
+          gh release upload "$TAG" \
+            dist/mkenv-darwin-arm64 \
+            dist/mkenv-darwin-arm64.sha256 \
+            dist/mkenv-darwin-amd64 \
+            dist/mkenv-darwin-amd64.sha256 \
+            dist/checksums.txt --clobber
+      
       - name: Update latest alias
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -77,8 +98,13 @@ jobs:
           git push -f origin latest
           gh release view latest >/dev/null 2>&1 || \
             gh release create latest --title latest --notes "Latest stable release."
-          gh release upload latest dist/mkenv-darwin-arm64 dist/mkenv-darwin-arm64.sha256 dist/checksums.txt --clobber
-
+          gh release upload latest \
+            dist/mkenv-darwin-arm64 \
+            dist/mkenv-darwin-arm64.sha256 \
+            dist/mkenv-darwin-amd64 \
+            dist/mkenv-darwin-amd64.sha256 \
+            dist/checksums.txt --clobber
+      
       - name: Update development alias
         if: github.ref == 'refs/heads/main' 
         env:
@@ -89,3 +115,64 @@ jobs:
           gh release view development >/dev/null 2>&1 || \
             gh release create development --title development --notes "Latest development build from main/master."
           gh release upload development dist/mkenv-darwin-arm64 dist/mkenv-darwin-arm64.sha256 dist/checksums.txt --clobber
+      
+      # NEW: Homebrew formula generation and publishing
+      - name: Generate Homebrew formula
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"  # Remove 'v' prefix if present
+          
+          ARM64_SHA=$(cat dist/mkenv-darwin-arm64.sha256 | cut -d' ' -f1)
+          AMD64_SHA=$(cat dist/mkenv-darwin-amd64.sha256 | cut -d' ' -f1)
+          
+          cat > mkenv.rb <<EOF
+          class Mkenv < Formula
+            desc "Fast, secure, reproducible local isolated development environment generator"
+            homepage "https://mkenv.sh/"
+            version "${VERSION}"
+            license "Elastic-2.0"
+          
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/0xa1bed0/mkenv/releases/download/${TAG}/mkenv-darwin-arm64"
+                sha256 "${ARM64_SHA}"
+              else
+                url "https://github.com/0xa1bed0/mkenv/releases/download/${TAG}/mkenv-darwin-amd64"
+                sha256 "${AMD64_SHA}"
+              end
+            end
+          
+            def install
+              bin.install "mkenv-darwin-arm64" => "mkenv" if Hardware::CPU.arm?
+              bin.install "mkenv-darwin-amd64" => "mkenv" if Hardware::CPU.intel?
+            end
+          
+            test do
+              assert_match version.to_s, shell_output("#{bin}/mkenv --version")
+            end
+          end
+          EOF
+          
+          cat mkenv.rb
+      
+      - name: Publish to Homebrew tap
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          
+          # Clone the tap repository
+          git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/0xa1bed0/homebrew-mkenv.git 
+          cd homebrew-mkenv
+          
+          # Copy the formula
+          cp ../mkenv.rb ./mkenv.rb
+          
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ./mkenv.rb
+          git commit -m "Update mkenv to ${TAG}" || echo "No changes to commit"
+          git push origin main 
