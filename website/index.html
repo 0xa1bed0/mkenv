@@ -11,25 +11,21 @@
     <div class="logo"><a href="index.html">mkenv.sh</a></div>
     <nav>
         <a href="#overview">Overview</a>
-        <a href="#problem">Why</a>
-        <a href="#llm-isolation">LLM Safety</a>
+        <a href="#what">What is mkenv?</a>
         <a href="#features">Features</a>
+        <a href="#problem">Why mkenv?</a>
         <a href="#how">How it Works</a>
-        <a href="#downloads">Downloads</a>
-        <a href="#installation">Installation</a>
-        <a href="#license">License</a>
+        <a href="#downloads">Download</a>
+        <a href="#installation">Install</a>
         <a href="docs.html">Docs</a>
         <a href="https://github.com/0xa1bed0/mkenv" target="_blank">GitHub</a>
     </nav>
 </header>
 <div class="container">
     <section class="hero" id="overview">
-        <h1>Zero-hustle isolation for your code and LLMs</h1>
-        <p>mkenv is a CLI that creates isolated sandbox environments that protect your laptop from supply chain attacks. Every npm install, pip install, or cargo build happens in a disposable sandbox - not on your host with access to your secrets.</p>
-        <p>Zero configuration - just one command</p>
-        <p>It inspects your project, estimates what the environment should look like, builds a disposable Docker container around it, and keeps both your code and your LLM locked inside that sandbox.</p>
-        <p>Your host should only need: Docker, a browser, Slack, and one mkenv binary.</p>
-        <p>Everything that happens inside mkenv stays inside mkenv. All toolchains, languages, packages, and scripts live and die inside mkenv.</p>
+        <h1>Isolated dev environments in one command</h1>
+        <p>mkenv creates disposable Docker sandboxes that protect your laptop from malicious code. Every npm install, pip install, and cargo build runs inside a container - not on your host machine where your SSH keys and credentials live.</p>
+        <p><strong>Run one command. Get a safe environment. No configuration needed.</strong></p>
         <div class="cta-group">
             <a class="cta-primary" href="https://github.com/0xa1bed0/mkenv" target="_blank">View on GitHub</a>
             <a class="cta-secondary" href="#installation">Get Started</a>
@@ -37,6 +33,19 @@
         </div>
     </section>
 
+    <section id="what">
+        <h2>WHAT IS MKENV?</h2>
+        <p>mkenv is a CLI tool that creates disposable Docker dev containers with zero configuration.</p>
+        <p><strong>How it works:</strong></p>
+        <ol>
+            <li>Run <code>mkenv .</code> in any project folder</li>
+            <li>mkenv detects your languages, tools, and dependencies automatically</li>
+            <li>It builds a hardened container with everything you need</li>
+            <li>Connect your editor/AI tools to the mkenv container - all commands, builds, and installs run inside</li>
+        </ol>
+        <p><strong>Result:</strong> Your host machine stays clean. Your SSH keys, tokens, and credentials stay safe.</p>
+        <script src="https://asciinema.org/a/NaufkeadmmN56lxWBscQD5Gmv.js" id="asciicast-NaufkeadmmN56lxWBscQD5Gmv" async="true"></script>
+    </section>
 
     <section id="problem">
         <h2>YEAH, THAT COULD BE YOU</h2>
@@ -44,16 +53,13 @@
             <p>Every experienced developer knows this feeling: your laptop is a graveyard of old runtimes, global installs, random scripts, and half-forgotten projects. And every time you run an install command or setup script, you're quietly gambling with your entire machine.</p>
             <p>I lost that gamble.</p>
             <p>One innocent-looking npm install - and suddenly I was rotating hundreds of passwords, revoking tokens, resetting SSH keys, reissuing cloud credentials, and eventually nuking my Mac because I had no idea what was touched.</p>
-            <p>And the painful part? I always knew I should be using isolated dev environments. But the moment I open a devcontainer.json or start thinking about a Dockerfile for local dev, my brain screams “not today”.</p>
+            <p>And the painful part? I always knew I should be using isolated dev environments. But the moment I open a devcontainer.json or start thinking about a Dockerfile for local dev, my brain screams "not today".</p>
+            <p><strong>That's exactly the pain mkenv removes. One command. Safe environment. No thinking. No disaster recovery next week.</strong></p>
         </div>
-        <br />
-
-        That's exactly the pain mkenv removes. One command. Safe environment. No thinking. No disaster recovery next week.
     </section>
 
     <section id="truth">
-        <div class="">
-            <h3>THE UGLY TRUTH: YOUR LAPTOP CONTAINS MORE THAN YOU THINK</h3>
+        <h3>THE UGLY TRUTH: YOUR LAPTOP CONTAINS MORE THAN YOU THINK</h3>
             <p>Your development machine silently holds:</p>
             <ul>
                 <li>SSH keys</li>
@@ -79,8 +85,8 @@
                 <div class="spoiler-content">
                     <ol>
                         <li>
-                          <p>The Shai-Hulud 2.0 npm worm [Supply Chain] [credential Theft] [Self-Propagation]</p>
-                          <p>A self-replicating npm worm known as Shai-Hulud was identified, backdooring hundreds of legitimate npm packages.</p>
+                          <p>Shai-Hulud 2.0 — [Supply Chain] [Credential Theft] [Self-Propagation]</p>
+                          <p>Updated version of the npm worm that backdoored hundreds of legitimate packages.</p>
                           <p><a href="https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/" target="_blank">https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/</a></p>
                         </li>
                         <li>
@@ -89,8 +95,8 @@
                             <p><a href="https://arxiv.org/abs/2504.17473" target="_blank">https://arxiv.org/abs/2504.17473</a></p>
                         </li>
                         <li>
-                            <p>Shai-Hulud NPM Worm — [Supply Chain] [Credential Theft] [Self-Propagation]</p>
-                            <p>A self-spreading npm worm stole tokens and auto-published malware using your credentials.</p>
+                            <p>Shai-Hulud 1.0 — [Supply Chain] [Credential Theft] [Self-Propagation]</p>
+                            <p>Original self-spreading npm worm that stole tokens and auto-published malware.</p>
                             <p><a href="https://www.blackduck.com/blog/npm-malware-attack-shai-hulud-threat.html" target="_blank">https://www.blackduck.com/blog/npm-malware-attack-shai-hulud-threat.html</a></p>
                         </li>
                         <li>
@@ -160,139 +166,125 @@
                         </li>
                     </ol>
                     <br />
-                    And many more… this is only the tip of the iceberg. 
+                    And many more… this is only the tip of the iceberg.
                 </div>
             </details>
-        </div>
     </section>
 
-    <section id="what">
-        <h2>WHAT IS MKENV?</h2>
-        <p>mkenv is a CLI (Elastic License 2.0) that creates disposable Docker dev containers with hardened defaults and almost zero setup.</p>
-        <p>You run <pre>mkenv .</pre> in any folder.</p>
-        <p>mkenv inspects the codebase, estimates the correct environment, generates a Dockerfile, builds a safe container, and drops you inside it.</p>
-        <p>Your editor and LLM run inside the container instead of your laptop.</p>
-        <pre>Your host stays clean.
-Your secrets stay safe.</pre>
-        <script src="https://asciinema.org/a/NaufkeadmmN56lxWBscQD5Gmv.js" id="asciicast-NaufkeadmmN56lxWBscQD5Gmv" async="true"></script>
-        <h3 id="features">CORE FEATURES</h3>
+    <section id="features">
+        <h2>CORE FEATURES</h2>
         <div class="columns">
             <div class="feature-box">
-                <h3>Zero-Config Environment Estimation</h3>
-                <p>mkenv determines languages, versions, CLIs, OS dependencies, build tools—everything—by analyzing your repo.</p>
-                <p>No Dockerfiles. No devcontainers. No YAML.</p>
+                <h3>Automatic Environment Detection</h3>
+                <p>mkenv analyzes your repo and automatically installs the right languages, versions, CLIs, and build tools.</p>
+                <p>No Dockerfiles. No devcontainer.json. No configuration files.</p>
             </div>
             <div class="feature-box">
-                <h3>LLM/IDE Sandboxing</h3>
-                <p>Run Claude Code, Codex, Cursor, VS Code, JetBrains, Copilot—everything inside the container.</p>
-                <p>Whether it's a malicious AI prompt, or wild AI-generated commands you didn't fully verify, the damage stays contained.</p>
-                <p><strong>Your credentials stay safe. Your machine stays clean.</strong></p>
+                <h3>Safe Terminal for AI Tools</h3>
+                <p>Use mkenv as a sandboxed terminal for Claude Code, Cursor, VS Code, and other AI coding tools.</p>
+                <p>AI-generated commands run inside the container, not on your host machine with access to your credentials.</p>
             </div>
             <div class="feature-box">
-                <h3>Disposable Environments</h3>
-                <p>Fresh container every run.</p>
-                <p>Cached dependencies for speed.</p>
-                <p>Throw away the environment the moment something feels off.</p>
+                <h3>Disposable Containers</h3>
+                <p>Each session gets a fresh container. Dependencies are cached for speed.</p>
+                <p>Something feels wrong? Delete the container and start over in seconds.</p>
             </div>
             <div class="feature-box">
-                <h3>Clean Host Principle</h3>
-                <p>Your host should only have Docker, Slack, browser, mkenv.</p>
-                <p>All toolchains live inside mkenv containers and die with them.</p>
+                <h3>Clean Host Machine</h3>
+                <p>Keep only Docker and mkenv on your laptop.</p>
+                <p>All language runtimes, packages, and tools run inside containers.</p>
             </div>
         </div>
     </section>
 
     <section id="how">
-        <h2>HOW MKENV WORKS</h2>
+        <h2>HOW IT WORKS</h2>
         <ol class="steps-list">
-            <li>Run mkenv .</li>
-            <li>mkenv inspects the repo and estimates the required environment.</li>
-            <li>It generates a Dockerfile automatically.</li>
-            <li>It builds a hardened image.</li>
-            <li>It logs all network activity.</li>
-            <li>It logs all installed OS packages.</li>
-            <li>Suspicious mounts are blocked.</li>
-            <li>No sudo — use "mkenv sandbox" for controlled changes.</li>
-            <li>Exit the container — everything disappears.</li>
+            <li>Run <code>mkenv .</code> in your project folder</li>
+            <li>mkenv analyzes your repo and generates a Dockerfile automatically</li>
+            <li>It builds a hardened container and drops you inside</li>
+            <li>All network activity and package installs are logged</li>
+            <li>No sudo access - use <code>mkenv sandbox</code> for system changes</li>
+            <li>Exit when done - the container is destroyed</li>
         </ol>
-        <h2>WHO NEEDS mkenv?</h2>
-        <ol class="steps-list">
-          <li>Anyone who runs npm install or pip install regularly</li>
-          <li>Anyone working on client projects or open source repos</li>
-          <li>Anyone who's ever thought "I should probably check these dependencies..."</li>
-          <li>Anyone using AI coding assistants that run commands automatically</li>
-          <li>Anyone who's had to rotate credentials "just to be safe"</li>
-        </ol>
+
+        <h3>Optional: .mkenv Configuration Files</h3>
+        <p>Use <code>.mkenv</code> files to set defaults without repeating command flags:</p>
+        <pre><code>{
+  "enabled_bricks": ["claude-code", "nvim"],
+  "volumes": ["~/data:/data"]
+}</code></pre>
+        <p>Place in your project root or any parent directory. Great for team-wide or organization-wide defaults. <a href="docs.html#mkenv-files">Learn more →</a></p>
+
+        <h2>WHO NEEDS THIS?</h2>
+        <ul class="steps-list">
+          <li>Developers running npm install, pip install, or cargo build regularly</li>
+          <li>Teams working on client projects or unfamiliar codebases</li>
+          <li>Anyone using AI coding assistants (Claude Code, Cursor, Copilot)</li>
+          <li>Security-conscious developers who want isolation without complexity</li>
+        </ul>
     </section>
 
     <section id="security">
-        <h2>SECURITY BY DEFAULT</h2>
+        <h2>SECURITY FEATURES</h2>
         <ul>
-            <li>Non-root container user</li>
-            <li>Only project folders are mounted</li>
-            <li>No access to host secrets</li>
-            <li>Ephemeral container state</li>
-            <li>No tokens/keys in (bash|zsh|sh) history</li>
-            <li>All changes go through auditable commands</li>
-            <li>Full network + install logs</li>
+            <li>Runs as non-root user inside the container</li>
+            <li>Only your project folder is accessible - no access to SSH keys, tokens, or credentials</li>
+            <li>All network requests and package installs are logged</li>
+            <li>Container state is temporary - nothing persists after you exit</li>
+            <li>System changes require explicit approval via <code>mkenv sandbox</code></li>
         </ul>
-        <p>If something bad happens, you just delete the container.</p>
+        <p><strong>If something malicious runs, delete the container and start fresh.</strong></p>
+    </section>
+
+    <section id="downloads">
+        <h2>DOWNLOADS</h2>
+        <p><strong>Current platform:</strong> macOS arm64 (Linux and Windows coming soon)</p>
+        <div class="download-grid">
+            <div class="download-card">
+                <h3>Latest Release</h3>
+                <p>Recommended for most users</p>
+                <a class="download-button primary" href="https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64" target="_blank">Download mkenv</a>
+                <a class="download-button" href="https://github.com/0xa1bed0/mkenv/releases/download/latest/checksums.txt" target="_blank">Checksums</a>
+            </div>
+            <div class="download-card">
+                <h3>All Releases</h3>
+                <p>Browse all versions</p>
+                <a class="download-button" href="https://github.com/0xa1bed0/mkenv/releases" target="_blank">View releases</a>
+                <p>Direct link format: <code>/releases/download/vX.Y.Z/mkenv-darwin-arm64</code></p>
+            </div>
+        </div>
     </section>
 
     <section id="installation">
-        <h2>Installation (macOS only for now)</h2>
-        <p>Linux is planned, Windows probably via WSL. Today it's macOS because that's where the founder got burned.</p>
-        <ol>
-            <li>Install Docker Desktop or Docker Engine. Make sure it's running.</li>
-            <li>Install mkenv via homebrew:</li>
-        </ol>
+        <h2>INSTALLATION</h2>
+        <p><strong>Current platform:</strong> macOS only (Linux and Windows/WSL coming soon)</p>
+        <p><strong>Prerequisites:</strong> Docker Desktop or Docker Engine must be installed and running</p>
+        <h3>Install via Homebrew</h3>
         <pre><code>brew tap 0xa1bed0/mkenv
 brew install mkenv</code></pre>
-        <ol start="3">
-            <li>Run <code>mkenv .</code> inside any project folder.</li>
-            <li>Let it analyze the repo, build the container, and drop you in.</li>
-        </ol>
-        <p>Next runs reuse caches, so you're back in fast. No devcontainer JSON headache.</p>
+        <h3>Usage</h3>
+        <pre><code>cd /path/to/your/project
+mkenv .</code></pre>
+        <p>mkenv will analyze your project, build a container, and drop you inside. Subsequent runs reuse cached dependencies for faster startup.</p>
     </section>
 
     <section id="license">
-        <h2>License (Elastic License 2.0)</h2>
-        <p>Use mkenv anywhere—personal projects, at work, across your entire company. Just don't turn around and sell it as your own product.</p>
+        <h2>LICENSE</h2>
+        <p>mkenv is released under the Elastic License 2.0 (ELv2)</p>
         <div class="license-box">
-            <p><strong>Allowed:</strong> personal hacking, using at work, org-wide installs, CI pipelines, internal tooling, forks with local mods.</p>
-            <p><strong>Not allowed:</strong> reselling mkenv, reselling forks, shipping it as SaaS, embedding it into commercial products, or building a hosted competitor out of it.</p>
-            <p>ELv2 keeps it free for devs while preventing someone from cloning it into a sketchy cloud service. No enterprise upsell, just guardrails.</p>
+            <p><strong>You can:</strong> Use mkenv for personal projects, at work, across your company, in CI pipelines, and modify it for internal use.</p>
+            <p><strong>You cannot:</strong> Resell mkenv, offer it as a hosted service (SaaS), or build a competing product from it.</p>
+            <p>ELv2 keeps mkenv free for developers while preventing commercial exploitation.</p>
         </div>
     </section>
 
     <section id="outro">
         <h2>TIRED DEVS MAKING LLM-ERA DEVELOPMENT LESS DANGEROUS</h2>
         <p>We're not a big corporation or Security Enterprise Platform™.</p>
-        <p>We’re devs who got burned by running malicious code and finally snapped.</p>
-        <p>This is the tool we wish existed before running that one bad command.</p>
-        <p>If you're thinking: "yeah… this is exactly the thing I've been too lazy to build myself" —</p>
-        <p>Good.</p>
-        <p>We built it for you.</p>
-        <p><a href="https://github.com/0xa1bed0/mkenv" target="_blank">Star mkenv on GitHub</a></p>
-    </section>
-
-    <section id="downloads">
-        <h2>Downloads</h2>
-        <p>Direct links to the latest builds. For a specific version, replace <code>vX.Y.Z</code> in the release URL.</p>
-        <div class="download-grid">
-            <div class="download-card">
-                <h3>Latest Stable (macOS arm64)</h3>
-                <p>Recommended for most users.</p>
-                <a class="download-button primary" href="https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64" target="_blank">Download binary</a>
-                <a class="download-button" href="https://github.com/0xa1bed0/mkenv/releases/download/latest/checksums.txt" target="_blank">Checksums</a>
-            </div>
-            <div class="download-card">
-                <h3>Semver Releases</h3>
-                <p>Stable versions by tag.</p>
-                <a class="download-button" href="https://github.com/0xa1bed0/mkenv/releases" target="_blank">Release list</a>
-                <p><code>/releases/download/vX.Y.Z/mkenv-darwin-arm64</code></p>
-            </div>
-        </div>
+        <p>We're developers who got burned by running malicious code and built the tool we wish we had.</p>
+        <p>If you've been thinking "I should really isolate my dev environment but it's too much work" - this is for you.</p>
+        <p><strong><a href="https://github.com/0xa1bed0/mkenv" target="_blank">Star mkenv on GitHub</a></strong></p>
     </section>
 </div>
 <footer>

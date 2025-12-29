@@ -19,29 +19,33 @@
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen)](../../issues)
 ![Status: Active](https://img.shields.io/badge/status-active-success)
 
-**mkenv** is a fast, secure, reproducible development environment generator. It creates fully isolated Docker-based dev environments in seconds — complete with your editor, tools, configs, caches, and volumes — without cluttering your host system.
+**mkenv** creates isolated Docker development environments in seconds. It automatically detects your project's requirements and builds a complete dev container with the right tools, configs, and caches - without cluttering your host system.
 
-`mkenv` integrates naturally with VS Code, Cursor, Neovim, Tmux, and other tools. It's designed for developers who want reproducible dev setups without Docker Compose bloat, without Nix complexity, and without leaking host state into containers.
+Works with VS Code, Cursor, Neovim, Tmux, and other tools. Zero configuration required.
 
 ---
 
 ## ⚡ Quickstart
 
 ```sh
-brew tap 0xa1bedo/mkenv
+# Install via Homebrew
+brew tap 0xa1bed0/mkenv
 brew install mkenv
+
+# Create isolated dev environment
+cd /path/to/your/project
+mkenv .
 ```
 
 ## 🚀 Key Features
 
 ### **Zero‑Config Environment Detection (the core feature)**
 
-`mkenv` automatically analyzes your project and **estimates exactly which development environment you need**.
+`mkenv` automatically analyzes your project and determines which development environment you need.
 
-* Detects languages (Go, NodeJS, Python, Rust, etc.)
-* Infers toolchain versions from files like `go.mod`, `brickage.json`, `.nvmrc`, etc.
-* Picks correct Bricks (language/tool building blocks)
-* Generates a sophisticated Docker environment **without a single configuration file**
+* Detects languages (Go, Node.js, Python, Rust, etc.)
+* Infers toolchain versions from `go.mod`, `package.json`, `.nvmrc`, and similar files
+* Generates a Docker environment without configuration files
 
 This is the main differentiator from Devcontainers, Nix, or Compose setups.
 
@@ -51,62 +55,40 @@ This is the main differentiator from Devcontainers, Nix, or Compose setups.
 mkenv .
 ```
 
-Creates a full Docker dev environment with:
+Creates a complete Docker dev environment with:
 
-* Auto‑generated Dockerfile (built from Bricks)
-* Proper language runtimes & dev tools
-* Auto-mounted project
-* Cached dependencies & build artifacts
-* Editor configs (optional)
-* Tmux + zsh environment (optional)
+* Auto-generated Dockerfile
+* Language runtimes and dev tools
+* Your project mounted inside
+* Cached dependencies and build artifacts
+* Optional: editor configs, tmux, zsh
 
-### **Disposable Containers, Persistent Everything Else**
+### **Disposable Containers, Persistent Caches**
 
-Containers are meant to be temporary — removed between sessions.
-But `mkenv` persists everything you care about:
+Containers are temporary and removed between sessions, but mkenv persists what matters:
 
-* zsh history
-* Tmux configs
-* Neovim configs
+* Shell history
+* Editor configs (tmux, neovim)
 * Language build caches
-* Dependency caches (`npm`, `go mod`, `pip`, …)
+* Dependency caches (npm, go, pip, etc.)
 
-You get **fresh container, warm caches**.
+Result: **Fresh containers with warm caches**. You can reset or disable caching anytime.
 
-You may reset cache or start container with no cache at all if you want.
+### **Currently Supported**
 
-### **Bricks: Modular Building Blocks**
+**Languages:**
+* Go
+* Node.js
 
-Bricks are small declarative units describing:
+**AI Coding Tools:**
+* Claude Code
+* Codex
 
-* Apt packages
-* User commands
-* Environment variables
-* Build steps
-* Version detection logic
-
-`mkenv` assembles Bricks into a full Dockerfile automatically.
-
-### **Editor Integration (in progress)**
-
-VS Code & Cursor extensions will:
-
-* Automatically open the project’s container
-* Run terminals inside mkenv
-* Run AI agents inside the mkenv environment
-
-### **Actively in Development**
-
-The tool already supports:
-
-* Golang
-* NodeJS
-* Debian base system
+**Editors & Tools:**
 * Neovim
 * Tmux
-* Core user workflow
 
-Feedback & contributions are very welcome.
+**Coming soon:** VS Code and Cursor extensions for seamless container integration.
 
 ---
 
@@ -122,69 +104,43 @@ Every project runs in its own sandbox.
 
 ### **Reproducible and debuggable**
 
-Your workspace image is built deterministically:
+Your workspace is built deterministically:
 
-* Dockerfile assembled from Bricks (system + language + common)
-* Hash-based cache keys ensure repeatable image builds
-* Build caches and volumes are isolated per project
+* Auto-generated Dockerfile based on detected requirements
+* Hash-based cache keys ensure repeatable builds
+* Isolated build caches and volumes per project
 
 ### **Fast rebuilds**
 
-Heavy dependencies are cached across rebuilds.
-
-### **Editor integration**
-
-VS Code and Cursor extensions (optional) allow:
-
-* Opening the project’s dev container automatically
-* Executing agent commands inside the container
-* Running terminals inside the container by default
+Dependencies and build artifacts are cached, making rebuilds nearly instant.
 
 ---
 
 ## 🧠 How It Works
 
-### **1. Compose a Workspace Image**
+### **1. Detect Your Environment**
 
-`mkenv` determines what language bricks to enable based on your folder:
+mkenv scans your project directory and detects:
 
-* Go
-* NodeJS
-* Python
-* Rust
-* etc.
+* Languages (Go, Node.js, Python, Rust, etc.)
+* Required packages and dependencies
+* Toolchain versions
 
-Each brick contributes:
+### **2. Build the Container**
 
-* Apt packages
-* Shell commands
-* Build arguments
-* User-level commands
-* Environment variables
+mkenv generates and builds a Dockerfile with:
 
-The system brick defines:
+* Appropriate base image
+* Language runtimes and tools
+* System packages
+* Security defaults (non-root user, isolated environment)
 
-* `FROM` base image
-* system-level arguments (username, uid/gid)
-* entrypoint + cmd guardrails
+### **3. Run and Connect**
 
-Everything is assembled into a deterministic Dockerfile.
-
-### **2. Run the Dev Container**
-
-Your container gets a deterministic name:
-
-```
-home_-projects-myapp-123abc
-```
-
-* Derived from the absolute path of your project
-* Home folder is replaced with `home_`
-
-### **3. Open an interactive shell**
-
-The container starts shell by default.
-Resizes dynamically with your terminal.
+* Container starts with an interactive shell
+* Your project is mounted inside
+* All dependencies are cached for fast rebuilds
+* Terminal resizes dynamically
 
 ---
 
@@ -196,12 +152,51 @@ Resizes dynamically with your terminal.
 mkenv .
 ```
 
-### **Leave environment:**
+### **Configuration with .mkenv files (optional)**
 
-Just exit the shell or tmux session.
-By default the container is removed.
+While mkenv works with zero configuration, you can customize behavior using `.mkenv` files. These files use the same options as command-line flags.
 
-Warning of tmux sessions: when you do `ctrl+b d` and this was the last session attached to tmux - the container will exit and be removed.
+**Example - Install tools for all projects in a directory:**
+
+Create `~/projects/.mkenv`:
+```json
+{
+  "enabled_bricks": ["codex", "nvim", "tmux"]
+}
+```
+
+Now `mkenv .` in any project under `~/projects/` automatically includes these tools.
+
+**Example - Project-specific configuration:**
+
+Create `.mkenv` in your project root:
+```json
+{
+  "enabled_bricks": ["claude-code"],
+  "volumes": ["~/datasets:/data"],
+  "disable_auto": false
+}
+```
+
+**How it works:**
+- mkenv searches from your project directory up to the root
+- All `.mkenv` files found are loaded and merged (root → project)
+- Child configs override parent configs
+- Command-line flags override all `.mkenv` files
+
+**Available fields:**
+- `enabled_bricks` - Tools to install (e.g., `["codex", "claude-code", "nvim", "tmux"]`)
+- `disabled_bricks` - Tools to exclude from auto-detection
+- `volumes` - Additional directories to mount (e.g., `["~/data:/data"]`)
+- `disable_auto` - Disable automatic language detection (default: `false`)
+
+This lets you set organization-wide defaults, team preferences, or project-specific requirements without repeating flags.
+
+### **Exit environment:**
+
+Exit the shell with `exit` or `Ctrl+D`. The container is removed automatically.
+
+**Note for tmux users:** If you detach from tmux (`Ctrl+b d`) and it's the last attached session, the container will exit and be removed.
 
 ### **Use with VS Code**
 
@@ -235,117 +230,82 @@ cache_<container>_go_mod
 cache_<container>_pip
 ```
 
-mkenv automatically creates and reuses volumes.
-You can define additional cache paths in your language brick.
+mkenv automatically creates and reuses volumes for optimal performance.
 
 ---
 
 ## 🔐 Security Considerations
 
-* All system-level commands are guarded and executed as root only during image build
-* All brick “common” commands run as user inside the container
-* No arbitrary user overrides of entrypoint or system args
-* The cache file is considered untrusted input; mkenv validates and rewrites it
-* Node/Golang/etc dependencies are installed *inside the workspace image*, never touching the host
+* System commands run as root only during image build
+* Container processes run as non-root user
+* Dependencies are installed inside the container, never on your host
+* Cache files are validated before use
+* No arbitrary container configuration overrides
 
 ---
 
-## 🧩 Bricks (Building Blocks)
+## 🔐 Guardrails and Policy Engine
 
-Bricks are declarative modules describing:
+mkenv ensures safety before you start:
 
-```go
-type CommonBrick struct {
-    Env map[string]string
-    Apt []string
-    UserCommands []string
-    DockerArgs map[string]string
-}
-
-type SystemBrick struct {
-    From string
-    BuildShell []string
-    SystemArgs map[string]string
-    // guards: cannot be overridden
-}
-```
-
-You can ship:
-
-* system brick (exactly one)
-* multiple language bricks (auto-detected)
-* multiple common bricks (merged)
+* Scans project files before creating containers and warns if secrets are detected
+* Supports folder whitelists to restrict where mkenv can run
+* Allows allowlists for volume mounts to prevent mounting sensitive directories
+* Automatically blocks dangerous folders like `~/.ssh` from being mounted (cannot be overridden)
 
 ---
 
-## 🔐 Guardrails and Policy engine
+## 🕸️ Automatic Port Forwarding
 
-mkenv will try it's best to ensure safety of your work even before you start:
+Docker doesn't allow dynamically exposing new ports on running containers. So how does `npm run dev` just work?
 
-* It will scan project files before creating container and notify you if any possible secrets found in the folder - mkenv environment is not the place where your secrets should be.
-* You can configure where mkenv can run: folder whitelist to make sure you never start isolation outside your projects folder. 
-* You can restric bricks to be auto-detected.
-* You can configure allowlist for volume mounts to your container to make sure no sensitive folders will be available inside the container.
-* mkenv will automatically block folders like ~/.ssh to be mounted from your host - this not configurable and can't be omited.
+mkenv automatically detects and forwards ports from your container to your host - no configuration needed.
 
----
+### How It Works
 
-## 🕸️ Automatic Port Exposing
+1. When you start mkenv, a lightweight forwarder runs on your host
+2. Inside the container, a daemon monitors for new listening sockets
+3. When your app binds to a port (e.g., `npm run dev` on port 3000), the daemon detects it
+4. The forwarder automatically opens the corresponding host port and routes traffic to the container
+5. Requests are forwarded to your application seamlessly
 
-Docker does not allow dynamically exposing new ports on a running container — once the container is started, its port mappings are fixed.
-So how are you supposed to run `npm run dev` and have it “just work”?
-
-The philosophy behind mkenv is that your development workflow should remain completely natural. You shouldn’t have to pre-declare ports, configure forwarding rules, or change your habits. Running npm run dev inside an mkenv environment should feel exactly like running it directly on your host.
-
-To make this possible, mkenv introduces a ultra-lightweight traffic forwarder on the host (no additional processes - it's all sitting inside your `mkenv .` invocation and dies when you exit the container) and an ultra-lightweight background proxy inside the container.
-
-How it works
-
-1. When you start mkenv (`mkenv .`), the host launches a tiny in-memmory forwarder.
-2. Inside the container, a background daemon continuously monitors `/proc` for new listening sockets.
-3. As soon as your application binds to a port — for example, when `npm run dev` starts listening on 3000 — the daemon detects it.
-4. It notifies the host forwarder, which automatically opens the corresponding host port and routes traffic into the container proxy.
-5. The proxy then forwards requests to your application exactly as if it were running on the host.
-
-The result
-
-A seamless, near-native development experience.
-
-Ports just work.
-
-Zero configuration.
-
-No Docker quirks leaking into your workflow.
-
-You run your tools.
-
-We make them reachable.
+**Result:** Ports just work. Zero configuration. No Docker quirks.
 
 ### Additional Details
 
-* Supports TCP and optionally UDP listeners.
-* Works even if your dev server restarts or repeatedly binds/unbinds ports.
-* Adds virtually no overhead — both the forwarder and the proxy are extremely small.
-* Automatically handles multiple services listening on multiple ports.
-* If a host port is already in use, mkenv gracefully warns you and continues.
-* mkenv also attempts to prebind the port inside the container so you get a proper `EADDRINUSE` error, matching native host behavior exactly.
-* all traffic went through proxy is auditable and logged for later inspection
+* Supports TCP and optionally UDP listeners
+* Works even if your dev server restarts or changes ports
+* Minimal overhead - both forwarder and proxy are lightweight
+* Handles multiple services on multiple ports automatically
+* Warns gracefully if a host port is already in use
+* Provides proper `EADDRINUSE` errors matching native behavior
+* All traffic is logged for auditing
 
 ## 📦 Installation
 
+### Homebrew (Recommended)
+
 ```sh
-brew tap 0xa1bedo/mkenv
+brew tap 0xa1bed0/mkenv
 brew install mkenv
 ```
 
-Need the **development** build instead?
-`https://github.com/0xa1bed0/mkenv/releases/download/development/mkenv-darwin-arm64`
+### Direct Downloads
 
-Want a **specific version**?
-`https://github.com/0xa1bed0/mkenv/releases/download/vX.Y.Z/mkenv-darwin-arm64`
+**Latest stable:**
+```
+https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64
+```
 
-Checksums for all available artifacts are also published as:
-`https://github.com/0xa1bed0/mkenv/releases/download/latest/checksums.txt`
+**Specific version:**
+```
+https://github.com/0xa1bed0/mkenv/releases/download/vX.Y.Z/mkenv-darwin-arm64
+```
+
+**Checksums:**
+```
+https://github.com/0xa1bed0/mkenv/releases/download/latest/checksums.txt
+```
 
 ---
 
@@ -363,13 +323,13 @@ Checksums for all available artifacts are also published as:
 
 ### 🔧 Short-Term (Next Steps)
 
-* Add more Bricks (languages, tools, frameworks, LLM runtimes)
-* In‑container management tool (ephemeral installs, runtime changes)
-* Internal refactoring + full test coverage
+* Support for more languages, tools, and frameworks
+* In-container management tool for runtime changes
+* Internal refactoring and full test coverage
 * VS Code & Cursor extensions
 * Network lockdown mode
-* Netowkr traffic audit (in and out container)
-* Safe `npm i` at docker build time 
+* Network traffic auditing (inbound and outbound)
+* Safe dependency installation during build 
 
 ### 🌱 Long-Term Vision
 
