@@ -25,7 +25,8 @@
 <div class="container">
     <section class="hero" id="overview">
         <h1>Zero-hustle isolation for your code and LLMs</h1>
-        <p>mkenv is a CLI that spins up hardened, per-project Docker environments so you can run any repo without gambling your laptop.</p>
+        <p>mkenv is a CLI that creates isolated sandbox environments that protect your laptop from supply chain attacks. Every npm install, pip install, or cargo build happens in a disposable sandbox - not on your host with access to your secrets.</p>
+        <p>Zero configuration - just one command</p>
         <p>It inspects your project, estimates what the environment should look like, builds a disposable Docker container around it, and keeps both your code and your LLM locked inside that sandbox.</p>
         <p>Your host should only need: Docker, a browser, Slack, and one mkenv binary.</p>
         <p>Everything that happens inside mkenv stays inside mkenv. All toolchains, languages, packages, and scripts live and die inside mkenv.</p>
@@ -42,7 +43,7 @@
         <div class="problem-block">
             <p>Every experienced developer knows this feeling: your laptop is a graveyard of old runtimes, global installs, random scripts, and half-forgotten projects. And every time you run an install command or setup script, you're quietly gambling with your entire machine.</p>
             <p>I lost that gamble.</p>
-            <p>One fake interview task, one repo clone, one innocent-looking npm run – and suddenly I was rotating hundreds of passwords, revoking tokens, resetting SSH keys, reissuing cloud credentials, and eventually nuking my Mac because I had no idea what was touched.</p>
+            <p>One innocent-looking npm install - and suddenly I was rotating hundreds of passwords, revoking tokens, resetting SSH keys, reissuing cloud credentials, and eventually nuking my Mac because I had no idea what was touched.</p>
             <p>And the painful part? I always knew I should be using isolated dev environments. But the moment I open a devcontainer.json or start thinking about a Dockerfile for local dev, my brain screams “not today”.</p>
         </div>
         <br />
@@ -184,7 +185,7 @@ Your secrets stay safe.</pre>
             <div class="feature-box">
                 <h3>LLM/IDE Sandboxing</h3>
                 <p>Run Claude Code, Codex, Cursor, VS Code, JetBrains, Copilot—everything inside the container.</p>
-                <p>Work with AI assistants in complete isolation. If the LLM goes wild, it only damages the sandbox, not your computer.</p>
+                <p>Whether it's a malicious AI prompt, or wild AI-generated commands you didn't fully verify, the damage stays contained.</p>
                 <p><strong>Your credentials stay safe. Your machine stays clean.</strong></p>
             </div>
             <div class="feature-box">
@@ -213,6 +214,14 @@ Your secrets stay safe.</pre>
             <li>Suspicious mounts are blocked.</li>
             <li>No sudo — use "mkenv sandbox" for controlled changes.</li>
             <li>Exit the container — everything disappears.</li>
+        </ol>
+        <h2>WHO NEEDS mkenv?</h2>
+        <ol class="steps-list">
+          <li>Anyone who runs npm install or pip install regularly</li>
+          <li>Anyone working on client projects or open source repos</li>
+          <li>Anyone who's ever thought "I should probably check these dependencies..."</li>
+          <li>Anyone using AI coding assistants that run commands automatically</li>
+          <li>Anyone who's had to rotate credentials "just to be safe"</li>
         </ol>
     </section>
 
@@ -259,7 +268,7 @@ brew install mkenv</code></pre>
     <section id="outro">
         <h2>TIRED DEVS MAKING LLM-ERA DEVELOPMENT LESS DANGEROUS</h2>
         <p>We're not a big corporation or Security Enterprise Platform™.</p>
-        <p>We’re devs who got burned by running untrusted code and finally snapped.</p>
+        <p>We’re devs who got burned by running malicious code and finally snapped.</p>
         <p>This is the tool we wish existed before running that one bad command.</p>
         <p>If you're thinking: "yeah… this is exactly the thing I've been too lazy to build myself" —</p>
         <p>Good.</p>
