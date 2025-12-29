@@ -6,9 +6,12 @@
 TARGET_OS   ?= darwin
 TARGET_ARCH ?= arm64
 
+VERSION ?= dev
+
 # Output dirs
 HOST_OUT   := dist/$(TARGET_OS)-$(TARGET_ARCH)
 AGENT_OUT  := internal/agentdist/bin
+
 
 # Default target: build everything
 all: fmt agent host
@@ -39,5 +42,5 @@ agent:
 host:
 	mkdir -p $(HOST_OUT)
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=0 \
-		go build -o $(HOST_OUT)/mkenv ./cmd/mkenv
+		go build -ldflags "-X github.com/0xa1bed0/mkenv/internal/version.Version=$(VERSION)" -o $(HOST_OUT)/mkenv ./cmd/mkenv
 
