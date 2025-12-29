@@ -14,6 +14,7 @@
         <a href="#downloads">Downloads</a>
         <a href="#installation">Installation</a>
         <a href="#quickstart">Quickstart</a>
+        <a href="#llm-support">LLM Support</a>
         <a href="#commands">Commands</a>
         <a href="#configuration">Configuration &amp; Behavior</a>
         <a href="#faq">FAQ</a>
@@ -24,7 +25,7 @@
     <section id="overview">
         <h2>Overview</h2>
         <p>mkenv is a CLI that builds and runs per-project developer containers using Docker with security-focused defaults, disposable sessions, and caching for language tooling. It exists for devs who would rather yeet a container than reimage their laptop.</p>
-        <p>This documentation assumes you already live inside a terminal, know Docker basics, and understand that trusting random repos is a losing bet. We cover how to install, run, and bend mkenv without touching YAML.</p>
+        <p>This documentation assumes you already live inside a terminal, and understand that trusting any repos is a losing bet. We cover how to install, run, and bend mkenv without touching YAML.</p>
     </section>
 
 
@@ -50,7 +51,7 @@ sudo mv mkenv-darwin-arm64 /usr/local/bin/mkenv</code></pre>
         <ol start="2">
             <li>Confirm it's on your PATH:</li>
         </ol>
-        <pre><code>mkenv --version</code></pre>
+        <pre><code>mkenv version</code></pre>
         <ol start="3">
             <li>Ensure Docker is running before you launch containers.</li>
         </ol>
@@ -79,11 +80,54 @@ sudo mv mkenv-darwin-arm64 /usr/local/bin/mkenv</code></pre>
         <h2>Quickstart</h2>
         <ol>
             <li>Clone or enter the repo you want to sandbox.</li>
-            <li>Run <code>mkenv .</code>.</li>
+            <li>Run "<code>mkenv .</code>"</li>
             <li>mkenv inspects manifests, builds a secure Docker image, and launches it.</li>
             <li>You land inside a non-root shell with tools installed; open your editor inside if you want it confined.</li>
         </ol>
         <p>First run builds the full image and primes caches for package managers, compilers, language servers, and editor plugins. Subsequent runs reuse cached layers, so containers spin up quickly unless you force a rebuild.</p>
+    </section>
+
+    <section id="llm-support">
+        <h2>LLM Support</h2>
+        <h3>Installation</h3>
+        <p>Install Claude Code or Codex using the <code>--tools</code> flag:</p>
+        <pre><code>mkenv . --tools claude-code
+mkenv . --tools codex
+mkenv . --tools claude-code,codex</code></pre>
+        <p>Available LLM tools:</p>
+        <ul>
+            <li><code>claude-code</code> — Anthropic's Claude Code CLI (installed via npm as <code>@anthropic-ai/claude-code</code>)</li>
+            <li><code>codex</code> — OpenAI's Codex CLI (installed via npm as <code>@openai/codex</code>)</li>
+        </ul>
+
+        <h3>Usage</h3>
+        <p>After installation, LLM tools are available in the container environment:</p>
+        <pre><code># Start container with Claude Code pre-installed
+mkenv . --tools claude-code
+
+# Inside container, run claude
+claude</code></pre>
+
+        <h3>Isolation Behavior</h3>
+        <p>LLM assistants run inside the container with the following constraints:</p>
+        <ul>
+            <li>Access limited to mounted project directory</li>
+            <li>No access to <code>~/.ssh</code>, <code>~/.aws</code>, <code>~/.config</code>, or host credential stores</li>
+            <li>No access to host filesystem outside project directory</li>
+            <li>Generated code and commands execute within container only</li>
+            <li>Container is ephemeral; removing it destroys all LLM-generated changes outside the project folder</li>
+        </ul>
+
+        <h3>Additional Tools</h3>
+        <p>Combine LLM tools with other available tools:</p>
+        <pre><code>mkenv . --tools claude-code,nvim,tmux</code></pre>
+        <p>Available tools via <code>--tools</code> flag:</p>
+        <ul>
+            <li><code>claude-code</code> — Claude Code CLI</li>
+            <li><code>codex</code> — Codex CLI</li>
+            <li><code>nvim</code> — NeoVim editor</li>
+            <li><code>tmux</code> — Terminal multiplexer</li>
+        </ul>
     </section>
 
     <section id="commands">

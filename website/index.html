@@ -12,6 +12,7 @@
     <nav>
         <a href="#overview">Overview</a>
         <a href="#problem">Why</a>
+        <a href="#llm-isolation">LLM Safety</a>
         <a href="#features">Features</a>
         <a href="#how">How it Works</a>
         <a href="#downloads">Downloads</a>
@@ -23,11 +24,11 @@
 </header>
 <div class="container">
     <section class="hero" id="overview">
-        <h1>Zero-hustle isolation for whatever repo you touch next.</h1>
+        <h1>Zero-hustle isolation for your code and LLMs</h1>
         <p>mkenv is a CLI that spins up hardened, per-project Docker environments so you can run any repo without gambling your laptop.</p>
         <p>It inspects your project, estimates what the environment should look like, builds a disposable Docker container around it, and keeps both your code and your LLM locked inside that sandbox.</p>
         <p>Your host should only need: Docker, a browser, Slack, and one mkenv binary.</p>
-        <p>All toolchains, languages, packages, and scripts live and die inside mkenv.</p>
+        <p>Everything that happens inside mkenv stays inside mkenv. All toolchains, languages, packages, and scripts live and die inside mkenv.</p>
         <div class="cta-group">
             <a class="cta-primary" href="https://github.com/0xa1bed0/mkenv" target="_blank">View on GitHub</a>
             <a class="cta-secondary" href="#installation">Get Started</a>
@@ -48,6 +49,7 @@
 
         That's exactly the pain mkenv removes. One command. Safe environment. No thinking. No disaster recovery next week.
     </section>
+
     <section id="truth">
         <div class="">
             <h3>THE UGLY TRUTH: YOUR LAPTOP CONTAINS MORE THAN YOU THINK</h3>
@@ -166,7 +168,7 @@
     <section id="what">
         <h2>WHAT IS MKENV?</h2>
         <p>mkenv is a CLI (Elastic License 2.0) that creates disposable Docker dev containers with hardened defaults and almost zero setup.</p>
-        <p>You run mkenv . in any folder.</p>
+        <p>You run <pre>mkenv .</pre> in any folder.</p>
         <p>mkenv inspects the codebase, estimates the correct environment, generates a Dockerfile, builds a safe container, and drops you inside it.</p>
         <p>Your editor and LLM run inside the container instead of your laptop.</p>
         <pre>Your host stays clean.
@@ -181,8 +183,9 @@ Your secrets stay safe.</pre>
             </div>
             <div class="feature-box">
                 <h3>LLM/IDE Sandboxing</h3>
-                <p>Cursor, VS Code, JetBrains, Claude, Copilot—everything runs inside the container.</p>
-                <p>If the LLM goes wild, it only damages the sandbox.</p>
+                <p>Run Claude Code, Codex, Cursor, VS Code, JetBrains, Copilot—everything inside the container.</p>
+                <p>Work with AI assistants in complete isolation. If the LLM goes wild, it only damages the sandbox, not your computer.</p>
+                <p><strong>Your credentials stay safe. Your machine stays clean.</strong></p>
             </div>
             <div class="feature-box">
                 <h3>Disposable Environments</h3>

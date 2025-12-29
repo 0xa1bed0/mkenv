@@ -42,6 +42,7 @@ If PATH is omitted, the current working directory is used.`,
 	rootCmd.AddCommand(newAttachCmd())
 	rootCmd.AddCommand(newCleanCmd())
 	rootCmd.AddCommand(newUITestCmd())
+	rootCmd.AddCommand(newVersionCmd())
 
 	return rootCmd.ExecuteContext(rt.Ctx())
 }
