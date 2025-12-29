@@ -28,11 +28,8 @@
 ## ⚡ Quickstart
 
 ```sh
-curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64 -o mkenv-darwin-arm64
-curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64.sha256 -o mkenv-darwin-arm64.sha256
-shasum -a 256 -c mkenv-darwin-arm64.sha256
-chmod +x mkenv-darwin-arm64
-./mkenv-darwin-arm64 .
+brew tap 0xa1bedo/mkenv
+brew install mkenv
 ```
 
 ## 🚀 Key Features
@@ -336,16 +333,9 @@ We make them reachable.
 
 ## 📦 Installation
 
-Coming soon — Homebrew formula & direct binary downloads.
-
-For now, download the latest darwin-arm64 binary:
-
 ```sh
-curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64 -o mkenv-darwin-arm64
-curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64.sha256 -o mkenv-darwin-arm64.sha256
-shasum -a 256 -c mkenv-darwin-arm64.sha256
-chmod +x mkenv-darwin-arm64
-sudo mv mkenv-darwin-arm64 /usr/local/bin/mkenv
+brew tap 0xa1bedo/mkenv
+brew install mkenv
 ```
 
 Need the **development** build instead?
@@ -356,12 +346,6 @@ Want a **specific version**?
 
 Checksums for all available artifacts are also published as:
 `https://github.com/0xa1bed0/mkenv/releases/download/latest/checksums.txt`
-
-Or install it from source:
-
-```
-go install github.com/0xa1bed0/mkenv@latest
-```
 
 ---
 

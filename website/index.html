@@ -235,14 +235,10 @@ Your secrets stay safe.</pre>
         <p>Linux is planned, Windows probably via WSL. Today it's macOS because that's where the founder got burned.</p>
         <ol>
             <li>Install Docker Desktop or Docker Engine. Make sure it's running.</li>
-            <li>Download the latest darwin-arm64 release from GitHub:</li>
+            <li>Install mkenv via homebrew:</li>
         </ol>
-        <pre><code>curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64 -o mkenv-darwin-arm64
-curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64.sha256 -o mkenv-darwin-arm64.sha256
-shasum -a 256 -c mkenv-darwin-arm64.sha256
-chmod +x mkenv-darwin-arm64
-sudo mv mkenv-darwin-arm64 /usr/local/bin/mkenv</code></pre>
-        <p>Specific versions use <code>/releases/download/vX.Y.Z/</code>.</p>
+        <pre><code>brew tap 0xa1bed0/mkenv
+brew install mkenv</code></pre>
         <ol start="3">
             <li>Run <code>mkenv .</code> inside any project folder.</li>
             <li>Let it analyze the repo, build the container, and drop you in.</li>

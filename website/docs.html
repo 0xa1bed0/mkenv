@@ -34,22 +34,18 @@
         <div class="note">Platform: macOS only right now. Linux is on the radar, Windows likely via WSL later. Bring Docker Desktop or equivalent.</div>
         <h3>Prerequisites</h3>
         <ul>
-            <li>macOS 12+ on Apple Silicon.</li>
+            <li>macOS 12+.</li>
             <li>Docker Desktop 4.x or Docker Engine with virtualization enabled.</li>
             <li>Terminal basics (zsh/bash) and permissions to install binaries to <code>$PATH</code>.</li>
         </ul>
         <h3>Download &amp; Install</h3>
         <ol>
-            <li>Grab the latest darwin-arm64 binary from GitHub Releases:</li>
+            <li>Install mkenv via homebrew:</li>
         </ol>
-        <pre><code>curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64 -o mkenv-darwin-arm64
-curl -L https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64.sha256 -o mkenv-darwin-arm64.sha256
-shasum -a 256 -c mkenv-darwin-arm64.sha256
-chmod +x mkenv-darwin-arm64
-sudo mv mkenv-darwin-arm64 /usr/local/bin/mkenv</code></pre>
-        <p>Specific versions use <code>/releases/download/vX.Y.Z/</code>.</p>
+        <pre><code>brew tap 0xa1bedo/mkenv
+brew install mkenv</code></pre>
         <ol start="2">
-            <li>Confirm it's on your PATH:</li>
+            <li>Confirm it's working:</li>
         </ol>
         <pre><code>mkenv version</code></pre>
         <ol start="3">
