@@ -6,6 +6,12 @@ on:
       - main
     tags:
       - "*"
+  paths:
+    - 'cmd/**'
+    - 'internal/**'
+    - 'go.mod'
+    - 'go.sum'
+    - 'Makefile'
 
 permissions:
   contents: write
