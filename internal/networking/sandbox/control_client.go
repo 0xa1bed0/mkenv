@@ -122,3 +122,27 @@ func (c *ControlClient) ListBlockedPorts(ctx context.Context) ([]int, error) {
 
 	return blockedPortsResponse.Ports, nil
 }
+
+func (c *ControlClient) Install(ctx context.Context, pkgName string) (*shared.OnInstallResponse, error) {
+	reqID := protocol.NewID()
+
+	installRequest := &shared.Install{PkgName: pkgName}
+
+	req, err := protocol.PackControlSignalEnvelope(reqID, "mkenv.sandbox.install", installRequest)
+	if err != nil {
+		return nil, fmt.Errorf("error while packing control signal: %v", err)
+	}
+
+	responseEnvelope, err := c.conn.Call(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var response shared.OnInstallResponse
+	err = protocol.UnpackControlSignalEnvelope(responseEnvelope, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error while unpacking control signal: %v", err)
+	}
+
+	return &response, nil
+}

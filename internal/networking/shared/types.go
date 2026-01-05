@@ -23,10 +23,18 @@ type OnSnapshotResponse struct {
 	Response map[int]string `json:"ports_allocation_status"`
 }
 
+type OnInstallResponse struct {
+	Logs string `json:"logs"`
+}
+
 type Expose struct {
 	Listener Listener `json:"listener"`
 }
 
 type BlockedPorts struct {
 	Ports []int `json:"ports"`
+}
+
+type Install struct {
+	PkgName string `json:"PkgName"`
 }

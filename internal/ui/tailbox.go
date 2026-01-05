@@ -155,6 +155,9 @@ func (t *tailHandle) printLocked(msg string) {
 
 	// Full log gets every tail line.
 	if l.full != nil {
+		if !strings.HasSuffix(msg, "\n") {
+			msg += "\n"
+		}
 		fmt.Fprintf(l.full, "[TAIL %s] %s", l.tail.name, msg)
 	}
 

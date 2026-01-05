@@ -79,6 +79,22 @@ func (plan *BuildPlan) processBrick(brick bricksengine.Brick) bricksengine.Cache
 	return bricksengine.CacheFoldersPaths{}
 }
 
+func (plan *BuildPlan) addExtraPackages(ctx context.Context, project *runtime.Project) {
+	extraPkgs := project.EnvConfig(ctx).ExtraPkgs()
+	if len(extraPkgs) == 0 {
+		return
+	}
+
+	logs.Debugf("Adding %d extra packages from .mkenv configuration", len(extraPkgs))
+
+	for _, pkgName := range extraPkgs {
+		plan.packages = append(plan.packages, bricksengine.PackageSpec{
+			Name: pkgName,
+			Meta: map[string]string{},
+		})
+	}
+}
+
 type Planner interface {
 	Plan(ctx context.Context) (*BuildPlan, error)
 }
@@ -122,10 +138,10 @@ func (p *planner) Plan(ctx context.Context) (*BuildPlan, error) {
 	}
 
 	logs.Debugf("compiling docker image build plan...")
-	return p.buildPlan()
+	return p.buildPlan(ctx)
 }
 
-func (p *planner) buildPlan() (*BuildPlan, error) {
+func (p *planner) buildPlan(ctx context.Context) (*BuildPlan, error) {
 	if p.systemBrick == nil {
 		return nil, errors.New("no System brick found")
 	}
@@ -187,6 +203,8 @@ func (p *planner) buildPlan() (*BuildPlan, error) {
 		}
 		plan.processBrick(brick)
 	}
+
+	plan.addExtraPackages(ctx, p.project)
 
 	plan.packages = uniquePackages(plan.packages)
 	plan.rootRun = uniqueCommands(plan.rootRun)

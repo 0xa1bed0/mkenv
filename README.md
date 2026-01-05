@@ -88,6 +88,9 @@ Result: **Fresh containers with warm caches**. You can reset or disable caching 
 * Neovim
 * Tmux
 
+**Infrastructure Tools:**
+* Pulumi
+
 **Coming soon:** VS Code and Cursor extensions for seamless container integration.
 
 ---
@@ -178,6 +181,17 @@ Create `.mkenv` in your project root:
 }
 ```
 
+**Example - Install additional system packages:**
+
+Create `.mkenv` in your project root:
+```json
+{
+  "extra_pkgs": ["git", "curl", "vim", "htop", "jq"]
+}
+```
+
+These packages will be installed via the system's package manager (e.g., apt-get on Debian-based systems).
+
 **How it works:**
 - mkenv searches from your project directory up to the root
 - All `.mkenv` files found are loaded and merged (root → project)
@@ -185,8 +199,9 @@ Create `.mkenv` in your project root:
 - Command-line flags override all `.mkenv` files
 
 **Available fields:**
-- `enabled_bricks` - Tools to install (e.g., `["codex", "claude-code", "nvim", "tmux"]`)
+- `enabled_bricks` - Tools to install (e.g., `["codex", "claude-code", "nvim", "tmux", "pulumi"]`)
 - `disabled_bricks` - Tools to exclude from auto-detection
+- `extra_pkgs` - Additional system packages to install (e.g., `["git", "curl", "vim"]`)
 - `volumes` - Additional directories to mount (e.g., `["~/data:/data"]`)
 - `disable_auto` - Disable automatic language detection (default: `false`)
 

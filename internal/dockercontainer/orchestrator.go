@@ -2,9 +2,13 @@ package dockercontainer
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
+	"github.com/0xa1bed0/mkenv/internal/bricks/systems"
+	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/dockerclient"
 	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/networking/host"
@@ -71,6 +75,7 @@ func (co *ContainerOrchestrator) startEnv() {
 		co.controlAPI.ServerProtocol.Handle(co.onPortSnapshot())
 		co.controlAPI.ServerProtocol.Handle(co.onExpose())
 		co.controlAPI.ServerProtocol.Handle(co.onGetBlockedPorts())
+		co.controlAPI.ServerProtocol.Handle(co.onInstallRequest())
 	})
 
 	containerCtx, cancelContainer := context.WithCancel(co.rt.Ctx())
@@ -181,5 +186,39 @@ func (co *ContainerOrchestrator) onGetBlockedPorts() (string, protocol.ControlCo
 		logs.Debugf("found blocked ports: %v", out)
 
 		return &shared.BlockedPorts{Ports: out}, nil
+	}
+}
+
+func (co *ContainerOrchestrator) onInstallRequest() (string, protocol.ControlCommandHandler) {
+	return "mkenv.sandbox.install", func(ctx context.Context, req protocol.ControlSignalEnvelope) (any, error) {
+		var request shared.Install
+		err := protocol.UnpackControlSignalEnvelope(req, &request)
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO: read system from container label
+		debian, err := systems.NewDebian(map[string]string{})
+		if err != nil {
+			return nil, err
+		}
+
+		pkgManager := debian.PackageManager()
+		if pkgManager == nil {
+			// TODO: assume apt manager?
+			return nil, errors.New("can't determine system's package manager")
+		}
+
+		var response strings.Builder
+		cmds := pkgManager.Install([]bricksengine.PackageSpec{{Name: request.PkgName}})
+		for _, cmd := range cmds {
+			resp, err := co.dockerClient.ExecAsRoot(ctx, co.rt.Container().ContainerID(), cmd.Argv)
+			if err != nil {
+				return nil, err
+			}
+			response.WriteString("running: " + strings.Join(cmd.Argv, " ") + "\n\n" + resp + "\n\n")
+		}
+
+		return &shared.OnInstallResponse{Logs: response.String()}, nil
 	}
 }

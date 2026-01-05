@@ -40,13 +40,13 @@ func ConfigBasePath() string {
 	return p
 }
 
-func projectDataPath(projectName string) string {
+func ProjectDataPath(projectName string) string {
 	p := filepath.Join(ConfigBasePath(), "projects", projectName)
 	return p
 }
 
 func logsPath(projectName string) string {
-	p := filepath.Join(projectDataPath(projectName), "logs")
+	p := filepath.Join(ProjectDataPath(projectName), "logs")
 	return p
 }
 
@@ -71,7 +71,7 @@ func AgentLogsPathOnHost(projectName, runID string) string {
 }
 
 func AgentBinaryPath(projectName string) string {
-	p := filepath.Join(projectDataPath(projectName), "bin")
+	p := filepath.Join(ProjectDataPath(projectName), "bin")
 	ensureFolder(p)
 	return p
 }

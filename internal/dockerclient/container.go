@@ -11,6 +11,7 @@ import (
 	"time"
 
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
+	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/networking/host"
 	"github.com/0xa1bed0/mkenv/internal/runtime"
 	"github.com/docker/docker/api/types/container"
@@ -120,6 +121,10 @@ func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Pr
 	if containerPortReservation.Err != nil {
 		err = containerPortReservation.Err
 		return
+	}
+
+	for _, bind := range binds {
+		logs.Debugf("binding %s", bind)
 	}
 
 	hostCfg := &container.HostConfig{

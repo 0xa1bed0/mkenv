@@ -68,7 +68,8 @@ func ExtractAgent(dstPath string) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
+	err = os.MkdirAll(filepath.Dir(dstPath), 0o755)
+	if err != nil {
 		return err
 	}
 

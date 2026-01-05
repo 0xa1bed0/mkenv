@@ -124,6 +124,14 @@ func (l *Logger) SetFullLogPath(path string) {
 	}
 
 	var err error
+
+	// Create parent directory if it doesn't exist
+	err = os.MkdirAll(filepath.Dir(path), 0o755)
+	if err != nil {
+		l.Error("can't create log directory: %v", err)
+		return
+	}
+
 	l.full, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		l.Error("can't open full log path: %v", err)

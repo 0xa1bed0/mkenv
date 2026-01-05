@@ -95,6 +95,13 @@ brew install mkenv</code></pre>
   "volumes": ["~/datasets:/data"]
 }</code></pre>
 
+        <h3>Example: Install Additional System Packages</h3>
+        <p>Create <code>.mkenv</code> in your project root:</p>
+        <pre><code>{
+  "extra_pkgs": ["git", "curl", "vim", "htop", "jq"]
+}</code></pre>
+        <p>These packages will be installed via the system's package manager (e.g., apt-get on Debian-based systems).</p>
+
         <h3>How It Works</h3>
         <ul>
             <li>mkenv walks up from your project directory to the filesystem root</li>
@@ -116,12 +123,17 @@ brew install mkenv</code></pre>
                 <tr>
                     <td><code>enabled_bricks</code></td>
                     <td>array</td>
-                    <td>Tools to install (e.g., <code>["codex", "claude-code", "nvim"]</code>)</td>
+                    <td>Tools to install (e.g., <code>["codex", "claude-code", "nvim", "pulumi"]</code>)</td>
                 </tr>
                 <tr>
                     <td><code>disabled_bricks</code></td>
                     <td>array</td>
                     <td>Tools to exclude from auto-detection</td>
+                </tr>
+                <tr>
+                    <td><code>extra_pkgs</code></td>
+                    <td>array</td>
+                    <td>Additional system packages to install (e.g., <code>["git", "curl", "vim"]</code>)</td>
                 </tr>
                 <tr>
                     <td><code>volumes</code></td>
@@ -171,7 +183,7 @@ claude</code></pre>
         <h3>Combining Tools</h3>
         <p>Install multiple tools at once:</p>
         <pre><code>mkenv . --tools claude-code,nvim,tmux</code></pre>
-        <p>Other available tools: <code>nvim</code>, <code>tmux</code>, <code>ripgrep</code></p>
+        <p>Other available tools: <code>nvim</code>, <code>tmux</code>, <code>pulumi</code></p>
     </section>
 
     <section id="commands">
@@ -198,7 +210,7 @@ claude</code></pre>
                 <tr>
                     <td><code>--tools</code></td>
                     <td>comma list</td>
-                    <td>Extra tools to preinstall (e.g. <code>nvim,tmux,ripgrep</code>).</td>
+                    <td>Extra tools to preinstall (e.g. <code>codex,claude,nvim,tmux,pulumi</code>).</td>
                     <td>none</td>
                 </tr>
                 <tr>

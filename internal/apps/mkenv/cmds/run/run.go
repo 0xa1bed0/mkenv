@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xa1bed0/mkenv/internal/agentdist"
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
+	sandboxappconfig "github.com/0xa1bed0/mkenv/internal/apps/sandbox/config"
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/dockerclient"
 	"github.com/0xa1bed0/mkenv/internal/dockercontainer"
@@ -168,12 +169,16 @@ func mkbinds(ctx context.Context, project *runtime.Project) ([]string, error) {
 	}
 
 	binds = append(binds, project.Path()+":/workdir")
+	// this is a hack for docker desktop race condition on folders on host
+	// TODO: invesatigate and fix
+	binds = append(binds, hostappconfig.ProjectDataPath(project.Name())+":/mnthack:ro")
 
 	agentHostPath := hostappconfig.AgentBinaryPath(project.Name())
 	if err := agentdist.ExtractAgent(agentHostPath); err != nil {
 		return nil, err
 	}
-	binds = append(binds, agentHostPath+":"+agentHostPath+":ro")
+	//binds = append(binds, agentHostPath+":"+agentHostPath+":ro")
+	binds = append(binds, agentHostPath+"/mkenv:"+sandboxappconfig.UserLocalBin+"/mkenv:ro")
 
 	return binds, nil
 }

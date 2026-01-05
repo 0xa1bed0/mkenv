@@ -10,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
+	sandboxappconfig "github.com/0xa1bed0/mkenv/internal/apps/sandbox/config"
 	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/runtime"
 	"github.com/docker/docker/api/types/container"
@@ -229,10 +229,8 @@ func (dc *DockerClient) KillContainer(containerID string) error {
 }
 
 func (dc *DockerClient) startSandboxDaemon(ctx context.Context, projectName, containerID string) error {
-	// TODO: this does not work everytime for some reason
 	execCfg := container.ExecOptions{
-		// TODO: move mkenv agent binary path in container as constant
-		Cmd:          []string{hostappconfig.AgentBinaryPath(projectName) + "/mkenv", "sandbox", "daemon"},
+		Cmd:          []string{sandboxappconfig.UserLocalBin + "/mkenv", "sandbox", "daemon"},
 		AttachStdout: false,
 		AttachStderr: false,
 		Tty:          false,
@@ -249,4 +247,52 @@ func (dc *DockerClient) startSandboxDaemon(ctx context.Context, projectName, con
 	}
 
 	return nil
+}
+
+func (dc *DockerClient) ExecAsRoot(ctx context.Context, containerID string, cmd []string) (string, error) {
+	execCfg := container.ExecOptions{
+		User:         "root",
+		Cmd:          cmd,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          false,
+	}
+
+	resp, err := dc.client.ContainerExecCreate(ctx, containerID, execCfg)
+	if err != nil {
+		return "", fmt.Errorf("exec create: %w", err)
+	}
+
+	// Attach to get output streams
+	hijack, err := dc.client.ContainerExecAttach(ctx, resp.ID, container.ExecAttachOptions{
+		Tty: false,
+	})
+	if err != nil {
+		return "", fmt.Errorf("exec attach: %w", err)
+	}
+	defer hijack.Close()
+
+	// Start the exec
+	err = dc.client.ContainerExecStart(ctx, resp.ID, container.ExecStartOptions{})
+	if err != nil {
+		return "", fmt.Errorf("exec start: %w", err)
+	}
+
+	// Read all output
+	output, err := io.ReadAll(hijack.Reader)
+	if err != nil {
+		return "", fmt.Errorf("read output: %w", err)
+	}
+
+	// Check exit code
+	inspectResp, err := dc.client.ContainerExecInspect(ctx, resp.ID)
+	if err != nil {
+		return string(output), fmt.Errorf("exec inspect: %w", err)
+	}
+
+	if inspectResp.ExitCode != 0 {
+		return string(output), fmt.Errorf("command failed with exit code %d", inspectResp.ExitCode)
+	}
+
+	return string(output), nil
 }

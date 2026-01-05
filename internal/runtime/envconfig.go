@@ -26,6 +26,7 @@ type EnvConfig interface {
 	DefaultSystemBrick() bricksengine.BrickID
 	ShouldDisableAuto() bool
 	Volumes() []string
+	ExtraPkgs() []string
 
 	FilePath() string           // path to .mkenv file that correspond to this env config
 	Signature() (string, error) // return signature of the object
@@ -40,6 +41,7 @@ type envConfig struct {
 	DefaultSystemBrick_       bricksengine.BrickID                       `json:"system"`
 	ShouldDisableAuto_        bool                                       `json:"disable_auto"`
 	Volumes_                  []string                                   `json:"volumes"`
+	ExtraPkgs_                []string                                   `json:"extra_pkgs"`
 }
 
 func (ec envConfig) Copy() *envConfig {
@@ -60,6 +62,10 @@ func (ec envConfig) Copy() *envConfig {
 	newEncConfig.Volumes_ = []string{}
 	for _, vol := range ec.Volumes_ {
 		newEncConfig.Volumes_ = append(newEncConfig.Volumes_, vol)
+	}
+	newEncConfig.ExtraPkgs_ = []string{}
+	for _, pkg := range ec.ExtraPkgs_ {
+		newEncConfig.ExtraPkgs_ = append(newEncConfig.ExtraPkgs_, pkg)
 	}
 	return newEncConfig
 }
@@ -150,6 +156,7 @@ func buildDefaultEnvConfig() *envConfig {
 		DefaultSystemBrick_:       "",
 		ShouldDisableAuto_:        false,
 		Volumes_:                  []string{},
+		ExtraPkgs_:                []string{},
 	}
 }
 
@@ -205,6 +212,11 @@ func (ec *envConfig) Merge(src EnvConfig) {
 	}
 
 	ec.Volumes_ = append(ec.Volumes_, src.Volumes()...)
+
+	ec.ExtraPkgs_ = append(ec.ExtraPkgs_, src.ExtraPkgs()...)
+	for _, pkg := range src.ExtraPkgs() {
+		logs.Debugf("Extra package %s requested by %s", pkg, src.FilePath())
+	}
 }
 
 func (ec *envConfig) FilePath() string {
@@ -248,6 +260,12 @@ func (ec *envConfig) DefaultSystemBrick() bricksengine.BrickID {
 
 func (ec *envConfig) ShouldDisableAuto() bool {
 	return ec.ShouldDisableAuto_
+}
+
+func (ec *envConfig) ExtraPkgs() []string {
+	out := []string{}
+	out = append(out, ec.ExtraPkgs_...)
+	return out
 }
 
 func ensureProjectPathIsSafe(ctx context.Context, policy guardrails.Policy, project *Project) error {
