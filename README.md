@@ -261,12 +261,151 @@ mkenv automatically creates and reuses volumes for optimal performance.
 
 ## 🔐 Guardrails and Policy Engine
 
-mkenv ensures safety before you start:
+mkenv includes a comprehensive policy engine that enforces security guardrails at multiple levels. Policies can be configured globally or per-project using a `policy.json` file.
 
-* Scans project files before creating containers and warns if secrets are detected
-* Supports folder whitelists to restrict where mkenv can run
-* Allows allowlists for volume mounts to prevent mounting sensitive directories
-* Automatically blocks dangerous folders like `~/.ssh` from being mounted (cannot be overridden)
+### Security Scanning
+
+**Secret Detection:**
+* Scans project files before creating containers
+* Warns if secrets, SSH keys, or credentials are detected
+* Requires explicit confirmation to proceed if sensitive files are found
+
+**Restricted Directories:**
+* Automatically blocks dangerous folders like `~/.ssh`, `~/.aws`, `~/.config` from being mounted
+* These restrictions cannot be overridden to prevent accidental credential exposure
+
+### Policy Configuration
+
+Create a `policy.json` file in your mkenv config directory to enforce organizational policies:
+
+```json
+{
+  "disabled_bricks": ["codex"],
+  "enabled_bricks": ["nvim", "tmux"],
+  "allowed_mount_paths": ["/home/user/projects", "/data"],
+  "allowed_project_path": "/home/user/projects",
+  "ignore_preferences": false,
+  "reverse_proxy": {
+    "denied_ports": [5432, 3306],
+    "allowed_ports": []
+  }
+}
+```
+
+**Policy Fields:**
+* `disabled_bricks` - Block specific tools from being installed (e.g., `["codex", "claude-code"]`)
+* `enabled_bricks` - Force-enable specific tools regardless of project detection
+* `allowed_mount_paths` - Whitelist of directories that can be mounted (empty = allow all except blocked)
+* `allowed_project_path` - Restrict where mkenv can run (empty = allow all)
+* `ignore_preferences` - Override user preferences with policy settings
+* `reverse_proxy` - Control which host ports containers can access (see below)
+
+**Policy File Security:**
+* Policy files must have `0444` permissions (read-only)
+* mkenv will refuse to start if policy file has incorrect permissions
+* This prevents unauthorized modification of security policies
+
+### Reverse Proxy Security
+
+mkenv allows containers to access host services (like databases) via a reverse proxy. The policy engine strictly controls which ports can be accessed.
+
+**Hardcoded Denied Ports (Always Blocked):**
+
+The following ports are **permanently blocked** and cannot be overridden by policy configuration:
+
+* **SSH & Remote Login:** 22, 2222
+* **Remote Desktop:** 3389 (RDP), 5900-5903 (VNC), 5800 (VNC/HTTP), 3283 (Apple Remote Desktop)
+* **File Sharing:** 445 (SMB), 139 (NetBIOS), 2049 (NFS), 111 (rpcbind)
+* **Admin Panels:** 80, 443, 8080, 8443, 9090 (common admin interfaces)
+* **Container Management:** 2375-2377 (Docker), 6443, 8001, 10250, 10255 (Kubernetes)
+* **macOS Services:** 548 (AFP), 631 (CUPS), 5353 (mDNS)
+* **Windows Services:** 135 (RPC), 593 (RPC/HTTP), 1433-1434 (MS SQL), 3268-3269 (LDAP)
+
+**Custom Port Policies:**
+
+```json
+{
+  "reverse_proxy": {
+    "denied_ports": [5432, 3306],
+    "allowed_ports": [8000, 8080]
+  }
+}
+```
+
+* `denied_ports` - Additional ports to block beyond hardcoded list
+* `allowed_ports` - Explicit allowlist (if set, only these ports are accessible, but hardcoded denials still apply)
+
+**Policy Enforcement:**
+* All reverse proxy connections are checked against policy
+* Denied connections are logged with source information
+* All successful proxy connections are logged for auditing
+
+### Tool Control (Bricks)
+
+Policies can control which tools (called "bricks") are available:
+
+```json
+{
+  "disabled_bricks": ["claude-code", "codex"],
+  "enabled_bricks": ["nvim", "tmux", "pulumi"]
+}
+```
+
+**Use Cases:**
+* Block AI coding tools in security-sensitive environments
+* Force-enable required development tools across teams
+* Disable automatic detection and use explicit tool lists only
+
+### Volume Mount Restrictions
+
+```json
+{
+  "allowed_mount_paths": [
+    "/home/user/projects",
+    "/data/shared"
+  ]
+}
+```
+
+* If `allowed_mount_paths` is set, only directories under these paths can be mounted
+* Empty list means "allow all" (except hardcoded blocked paths like `~/.ssh`)
+* Relative paths are resolved before checking
+* Symlink targets are checked against policy
+
+### Project Path Restrictions
+
+```json
+{
+  "allowed_project_path": "/home/user/approved-projects"
+}
+```
+
+* Restricts where mkenv can be run
+* Useful for isolating work projects from personal projects
+* Empty string means "allow all"
+
+### Example: Enterprise Policy
+
+```json
+{
+  "disabled_bricks": ["codex"],
+  "enabled_bricks": ["nvim"],
+  "allowed_project_path": "/work/projects",
+  "allowed_mount_paths": ["/work"],
+  "ignore_preferences": true,
+  "reverse_proxy": {
+    "denied_ports": [5432, 3306, 6379, 27017],
+    "allowed_ports": []
+  }
+}
+```
+
+This policy:
+* Blocks OpenAI Codex but allows Neovim
+* Restricts mkenv to `/work/projects` directory only
+* Prevents mounting anything outside `/work`
+* Blocks access to common database ports from containers
+* Ignores user preferences to enforce organizational standards
 
 ---
 

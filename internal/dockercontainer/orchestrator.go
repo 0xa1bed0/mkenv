@@ -10,6 +10,7 @@ import (
 	"github.com/0xa1bed0/mkenv/internal/bricks/systems"
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/dockerclient"
+	"github.com/0xa1bed0/mkenv/internal/guardrails"
 	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/networking/host"
 	"github.com/0xa1bed0/mkenv/internal/networking/protocol"
@@ -25,6 +26,7 @@ type ContainerOrchestrator struct {
 	rt                *runtime.Runtime
 	dockerClient      *dockerclient.DockerClient
 	controlAPI        *host.ControlListener
+	reverseProxy      *host.ReverseProxyServer
 	forwarderRegistry *host.ForwarderRegistry
 	exitCh            chan OrchestratorExitSignal
 
@@ -39,12 +41,25 @@ func NewContainerOrchestrator(rt *runtime.Runtime, binds []string, dockerClient 
 		return nil, err
 	}
 
+	// Load policy for reverse proxy configuration
+	policy, err := guardrails.LoadPolicy()
+	if err != nil {
+		return nil, fmt.Errorf("load policy: %w", err)
+	}
+
+	// Start reverse proxy server on random port
+	reverseProxy, err := host.StartReverseProxyServer(rt, policy)
+	if err != nil {
+		return nil, fmt.Errorf("start reverse proxy: %w", err)
+	}
+
 	forwarderRegistry := host.NewForwarderRegistry(rt)
 
 	return &ContainerOrchestrator{
 		rt:                rt,
 		dockerClient:      dockerClient,
 		controlAPI:        controlAPI,
+		reverseProxy:      reverseProxy,
 		forwarderRegistry: forwarderRegistry,
 		exitCh:            exitCh,
 		binds:             binds,
@@ -82,7 +97,10 @@ func (co *ContainerOrchestrator) startEnv() {
 
 	co.rt.Container().SetStopContainer(cancelContainer)
 
-	containerID, containerPortRessservation, err := co.dockerClient.CreateContainer(containerCtx, co.rt.Project(), co.rt.Container().ImageTag(), co.controlAPI.Env, co.binds)
+	// Build environment variables including reverse proxy address
+	envs := co.getEnvVars()
+
+	containerID, containerPortRessservation, err := co.dockerClient.CreateContainer(containerCtx, co.rt.Project(), co.rt.Container().ImageTag(), envs, co.binds)
 	if err != nil {
 		co.exitCh <- OrchestratorExitSignal{Err: err}
 		return
@@ -111,6 +129,21 @@ func (co *ContainerOrchestrator) startEnv() {
 	case <-containerCtx.Done():
 		logs.Infof("container killed from outside")
 	}
+}
+
+// getEnvVars builds the complete set of environment variables for the container,
+// including control API and reverse proxy addresses
+func (co *ContainerOrchestrator) getEnvVars() []string {
+	envs := make([]string, len(co.controlAPI.Env))
+	copy(envs, co.controlAPI.Env)
+
+	// Add reverse proxy address for container to dial back to host
+	reverseProxyPort := co.reverseProxy.Port()
+	reverseProxyEnv := fmt.Sprintf("MKENV_REVERSE_PROXY=host.docker.internal:%d", reverseProxyPort)
+	envs = append(envs, reverseProxyEnv)
+
+	logs.Debugf("Container env vars: %v", envs)
+	return envs
 }
 
 func (co *ContainerOrchestrator) onPortSnapshot() (string, protocol.ControlCommandHandler) {
@@ -175,11 +208,20 @@ func (co *ContainerOrchestrator) onGetBlockedPorts() (string, protocol.ControlCo
 		}
 
 		out := []int{}
+		reverseProxyPort := co.reverseProxy.Port()
 
 		for _, port := range ports {
+			// Skip ports already forwarded by us
 			if co.forwarderRegistry.Has(port) {
 				continue
 			}
+
+			// CRITICAL: Don't tell container to prebind our reverse proxy port!
+			// Otherwise infinite loop: container can't dial reverse proxy because it's blocked
+			if port == reverseProxyPort {
+				continue
+			}
+
 			out = append(out, port)
 		}
 

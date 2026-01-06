@@ -137,6 +137,9 @@ func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Pr
 				},
 			},
 		},
+		ExtraHosts: []string{
+			"host.docker.internal:host-gateway",
+		},
 	}
 
 	volumes, err := dc.resolveCacheVolumes(ctx, imageTag, project)

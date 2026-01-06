@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"syscall"
 	"time"
@@ -15,13 +16,15 @@ import (
 )
 
 type prebinds struct {
-	mu    sync.Mutex
-	ports map[int]io.Closer
+	mu               sync.Mutex
+	ports            map[int]io.Closer
+	reverseProxyAddr string
 }
 
-func newPrebinds() *prebinds {
+func newPrebinds(reverseProxyAddr string) *prebinds {
 	return &prebinds{
-		ports: map[int]io.Closer{},
+		ports:            map[int]io.Closer{},
+		reverseProxyAddr: reverseProxyAddr,
 	}
 }
 
@@ -53,9 +56,23 @@ func (p *prebinds) Add(port int) {
 		return
 	}
 
-	logs.Infof("prebinding port %d as it is claimed by host", port)
+	// If reverse proxy is configured, create a forwarder instead of blocking
+	if p.reverseProxyAddr != "" {
+		logs.Infof("creating reverse forwarder for host port %d -> %s", port, p.reverseProxyAddr)
 
-	// TODO: introduce proto
+		forwarder := sandbox.NewReverseForwarder(port, p.reverseProxyAddr)
+		if err := forwarder.Start(); err != nil {
+			logs.Errorf("can't start reverse forwarder on port %d: %v", port, err)
+			return
+		}
+
+		p.ports[port] = forwarder
+		return
+	}
+
+	// Fallback: old behavior - just block the port with noop listener
+	logs.Infof("prebinding port %d as it is claimed by host (blocking mode)", port)
+
 	closer, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		logs.Errorf("can't prebind port: %v", err)
@@ -97,8 +114,16 @@ func newPortsOrchestrator(rt *runtime.Runtime) *portsOrchestrator {
 		_ = conn.Close()
 	})
 
+	// Get reverse proxy address from environment
+	reverseProxyAddr := os.Getenv("MKENV_REVERSE_PROXY")
+	if reverseProxyAddr == "" {
+		logs.Warnf("MKENV_REVERSE_PROXY not set, reverse proxy disabled (ports will be blocked)")
+	} else {
+		logs.Infof("Reverse proxy enabled, will forward to %s", reverseProxyAddr)
+	}
+
 	return &portsOrchestrator{
-		prebinds:    newPrebinds(),
+		prebinds:    newPrebinds(reverseProxyAddr),
 		rt:          rt,
 		controlConn: conn,
 	}
