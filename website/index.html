@@ -21,6 +21,9 @@
         <a href="https://github.com/0xa1bed0/mkenv" target="_blank">GitHub</a>
     </nav>
 </header>
+<div class="experimental-warning">
+    ⚠️ <strong>Early Stage Software:</strong> mkenv is experimental. Expect breaking changes, incomplete features, and occasional instability. We're releasing early to gather feedback from developers.
+</div>
 <div class="container">
     <section class="hero" id="overview">
         <h1>Isolated dev environments in one command</h1>
@@ -251,7 +254,9 @@
 
     <section id="downloads">
         <h2>DOWNLOADS</h2>
-        <p><strong>Current platform:</strong> macOS arm64 (Linux and Windows coming soon)</p>
+        <div class="note">
+            <strong>Platform Support:</strong> Currently macOS arm64 only. Linux support is in development. Windows support planned via WSL.
+        </div>
         <div class="download-grid">
             <div class="download-card">
                 <h3>Latest Release</h3>
@@ -270,7 +275,9 @@
 
     <section id="installation">
         <h2>INSTALLATION</h2>
-        <p><strong>Current platform:</strong> macOS only (Linux and Windows/WSL coming soon)</p>
+        <div class="note">
+            <strong>Platform Support:</strong> Currently macOS only. Linux support in development. Windows support planned via WSL.
+        </div>
         <p><strong>Prerequisites:</strong> Docker Desktop or Docker Engine must be installed and running</p>
         <h3>Install via Homebrew</h3>
         <pre><code>brew tap 0xa1bed0/mkenv
@@ -292,9 +299,9 @@ mkenv .</code></pre>
     </section>
 
     <section id="outro">
-        <h2>TIRED DEVS MAKING LLM-ERA DEVELOPMENT LESS DANGEROUS</h2>
+        <h2>BUILT BY DEVELOPERS WHO GOT BURNED</h2>
         <p>We're not a big corporation or Security Enterprise Platform™.</p>
-        <p>We're developers who got burned by running malicious code and built the tool we wish we had.</p>
+        <p>We're developers who got burned by supply chain attacks and built the tool we wish we had.</p>
         <p>If you've been thinking "I should really isolate my dev environment but it's too much work" - this is for you.</p>
         <p><strong><a href="https://github.com/0xa1bed0/mkenv" target="_blank">Star mkenv on GitHub</a></strong></p>
     </section>

@@ -199,6 +199,16 @@ table th {
     padding: 12px;
     font-size: 14px;
 }
+.experimental-warning {
+    background: #fff3cd;
+    border: 2px solid #d39e00;
+    border-left: none;
+    border-right: none;
+    padding: 12px 40px;
+    text-align: center;
+    font-size: 14px;
+    color: #856404;
+}
 footer {
     text-align: center;
     margin-top: 40px;
