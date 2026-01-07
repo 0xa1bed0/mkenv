@@ -85,7 +85,7 @@ func copyOneWay(dst, src net.Conn) {
 }
 
 func isNormalCloseErr(err error) bool {
-	logs.Infof("got error: %v", err)
+	logs.Debugf("got error: %v", err)
 	if err == nil {
 		return false
 	}

@@ -50,7 +50,7 @@ func StartReverseProxyServer(rt *runtime.Runtime, policy guardrails.Policy) (*Re
 	}
 
 	addr := server.Listener.Addr().String()
-	logs.Infof("[mkenv host] reverse proxy server will listen on %s", addr)
+	logs.Debugf("[mkenv host] reverse proxy server will listen on %s", addr)
 
 	rps.addr = addr
 	rps.srv = server
@@ -60,7 +60,7 @@ func StartReverseProxyServer(rt *runtime.Runtime, policy guardrails.Policy) (*Re
 		rps.Stop()
 	})
 
-	logs.Infof("[mkenv host] reverse proxy server listening on %s", addr)
+	logs.Debugf("[mkenv host] reverse proxy server listening on %s", addr)
 	return rps, nil
 }
 
@@ -112,7 +112,7 @@ func (rps *ReverseProxyServer) handleConn(clientConn net.Conn) {
 	}
 	defer backendConn.Close()
 
-	logs.Infof("[mkenv host] reverse proxy: container -> host:%d (start)", port)
+	logs.InfofSilent("[mkenv host] reverse proxy: container -> host:%d (start)", port)
 
 	// Use bufferedConn to handle already-read header bytes
 	client := &bufferedConn{
@@ -122,5 +122,5 @@ func (rps *ReverseProxyServer) handleConn(clientConn net.Conn) {
 
 	protocol.PumpBidirectional(client, backendConn)
 
-	logs.Infof("[mkenv host] reverse proxy: container -> host:%d (done)", port)
+	logs.InfofSilent("[mkenv host] reverse proxy: container -> host:%d (done)", port)
 }

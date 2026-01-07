@@ -177,7 +177,7 @@ func (rt *Runtime) GoNamed(name string, fn func()) {
 	}
 	rt.wg.Go(func() {
 		if name != "ControlServer:DispatchEnvelope" {
-			logs.Infof("%s goroutine start", name)
+			logs.Debugf("%s goroutine start", name)
 		}
 		defer func() {
 			// recover panic
@@ -195,7 +195,7 @@ func (rt *Runtime) GoNamed(name string, fn func()) {
 
 		fn()
 		if name != "ControlServer:DispatchEnvelope" {
-			logs.Infof("%s goroutine finish", name)
+			logs.Debugf("%s goroutine finish", name)
 		}
 	})
 }

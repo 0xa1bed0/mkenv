@@ -27,7 +27,7 @@ func ServeTCP(rt *runtime.Runtime, addr string, onConn func(context.Context, net
 
 	routineName := fmt.Sprintf("ServeTCP;Accept loop;%s;", addr)
 	rt.GoNamed(routineName, func() {
-		logs.Infof("tcp protocol. start accepting connections")
+		logs.Debugf("tcp protocol. start accepting connections")
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
@@ -35,17 +35,17 @@ func ServeTCP(rt *runtime.Runtime, addr string, onConn func(context.Context, net
 				// so there is a huge chance we accept on closed connection. We will log it just in case and exit
 				if ctx.Err() != nil {
 					// context canceled; listener closed intentionally
-					logs.Infof("accept loop stopped due to context: %v", err)
+					logs.Debugf("accept loop stopped due to context: %v", err)
 				} else {
-					logs.Infof("accept error: %v", err)
+					logs.Debugf("accept error: %v", err)
 				}
 				return
 			}
 
-			logs.Infof("tcp protocol: handling connection")
+			logs.Debugf("tcp protocol: handling connection")
 
 			rt.GoNamed(routineName+"onConn", func() {
-				logs.Infof("Transport: call onConn")
+				logs.Debugf("Transport: call onConn")
 				onConn(ctx, conn)
 			})
 		}
