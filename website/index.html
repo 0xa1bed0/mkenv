@@ -27,38 +27,13 @@
 <div class="container">
     <section class="hero" id="overview">
         <h1>Isolated dev environments in one command</h1>
-        <p>mkenv creates disposable Docker sandboxes that isolate your work and your LLM coding agents from your laptop. Every npm install, pip install, AI-generated command, and build runs inside a container - not on your host machine where your SSH keys and credentials live.</p>
+        <p>mkenv creates disposable containerized sandboxes that isolate your work and your LLM agents from your laptop. Every npm install, pip install, AI-generated command, and build runs inside a container - not on your host machine where your SSH keys and credentials live.</p>
         <p><strong>Run one command. Get a safe environment that works exactly like localhost. No configuration needed.</strong></p>
         <div class="cta-group">
             <a class="cta-primary" href="https://github.com/0xa1bed0/mkenv" target="_blank">View on GitHub</a>
             <a class="cta-secondary" href="#installation">Get Started</a>
             <a class="cta-secondary" href="docs.html">Read the Docs</a>
         </div>
-    </section>
-
-    <section id="what">
-        <h2>WHAT IS MKENV?</h2>
-        <p>mkenv is a CLI tool that creates isolated Docker environments where both you and your LLM coding agents work safely - away from your credentials.</p>
-
-        <p><strong>Think of it as localhost, but actually isolated:</strong></p>
-        <ul>
-            <li>Your LLM agent (Claude Code, Cursor, Copilot) runs commands inside mkenv - not on your real machine</li>
-            <li>Every <code>npm install</code>, <code>pip install</code>, and AI-generated script executes in the sandbox</li>
-            <li>The environment behaves exactly like your normal localhost - servers, databases, builds all work normally</li>
-            <li>But it can't access your SSH keys, browser sessions, tokens, or files outside the project</li>
-            <li>Your host OS and other applications stay completely unreachable - no system-level damage possible</li>
-        </ul>
-
-        <p><strong>How it works:</strong></p>
-        <ol>
-            <li>Run <code>mkenv .</code> in any project folder</li>
-            <li>mkenv detects your languages, tools, and dependencies automatically</li>
-            <li>It builds a hardened container with everything you need</li>
-            <li>You're dropped into the isolated environment - use your coding tools from inside</li>
-            <li>Work normally - servers bind to ports, files sync, everything feels like localhost</li>
-        </ol>
-        <p><strong>Result:</strong> You get the convenience of localhost with the safety of isolation. Your LLM agent has full freedom to execute code, install packages, and run builds - without access to your real credentials.</p>
-        <script src="https://asciinema.org/a/NaufkeadmmN56lxWBscQD5Gmv.js" id="asciicast-NaufkeadmmN56lxWBscQD5Gmv" async="true"></script>
     </section>
 
     <section id="problem">
@@ -185,6 +160,51 @@
             </details>
     </section>
 
+    <section id="what">
+        <h2>WHAT IS MKENV?</h2>
+        <p>mkenv is a CLI tool that creates isolated Docker environments where both you and your LLM coding agents work safely - away from your credentials and host OS.</p>
+
+        <p><strong>Think of it as localhost, but actually isolated:</strong></p>
+        <ul>
+            <li>Your LLM agents run commands inside mkenv - not on your real machine</li>
+            <li>Every <code>npm install</code>, <code>pip install</code>, and AI-generated script executes in the sandbox</li>
+            <li>The environment behaves exactly like your normal localhost - servers, databases, builds all work normally</li>
+            <li>But it can't access your SSH keys, browser sessions, tokens, or files outside the project</li>
+            <li>Your host OS and other applications stay completely unreachable - no system-level damage possible</li>
+        </ul>
+
+        <h3>How LLM Isolation Works</h3>
+        <pre><code>macos$ mkenv . --tools claude
+# mkenv builds container with claude-code CLI installed
+# drops you into the container shell
+
+container$ claude "install dependencies and set up database"
+# Claude Code runs npm install, pip install, executes setup scripts
+# All inside the isolated environment
+
+container$ # AI generates a bad command or malicious package runs
+container$ # rm -rf / happens, environment breaks - no problem
+
+container$ exit
+
+macos$ mkenv .
+# Fresh container in seconds. Your Mac stays untouched.
+</code></pre>
+        <p>When your LLM executes code, installs packages, or runs scripts - everything stays in the container. Your SSH keys, tokens, browser sessions, and <strong>your host OS</strong> stay on your Mac, completely unreachable.</p>
+        <p>Something breaks? Exit and restart. The container is disposable. Your machine isn't.</p>
+
+        <p><strong>How it works:</strong></p>
+        <ol>
+            <li>Run <code>mkenv .</code> in any project folder</li>
+            <li>mkenv detects your languages, tools, and dependencies automatically</li>
+            <li>It builds a hardened container with everything you need</li>
+            <li>You're dropped into the isolated environment - use your coding tools from inside</li>
+            <li>Work normally - servers bind to ports, files sync, everything feels like localhost</li>
+        </ol>
+        <p><strong>Result:</strong> You get the convenience of localhost with the safety of isolation. Your LLM agent has full freedom to execute code, install packages, and run builds - without access to your real credentials.</p>
+    </section>
+
+
     <section id="features">
         <h2>CORE FEATURES</h2>
         <div class="columns">
@@ -195,7 +215,7 @@
             </div>
             <div class="feature-box">
                 <h3>Isolated Sandbox for LLM Agents</h3>
-                <p>Your LLM coding agent (Claude Code, Cursor, Copilot, VS Code) works inside mkenv - completely isolated from your real machine.</p>
+                <p>Your LLM coding agents work inside mkenv - completely isolated from your real machine.</p>
                 <p>AI-generated commands, package installs, and build scripts execute in the sandbox. Your SSH keys, browser tokens, credentials, OS, and other apps stay completely unreachable.</p>
             </div>
             <div class="feature-box">
@@ -222,6 +242,61 @@
             <li>Exit when done - the container is destroyed</li>
         </ol>
 
+        <h3>Automatic Port Forwarding</h3>
+        <pre><code>
+┌──────────┐                                          
+│ Browser  │                                          
+│ :3000    │                                          
+└────┬─────┘                                          
+     │                                                
+     │         ┌─────────────────────────────────────────────┐
+     │         │       Your Mac (Host)                       │
+     │         │                                             │
+     │         │  ┌───────────────────────┐                  │
+     │         │  │  mkenv host process   │    ┌──────────┐  │
+     └────────────►                       │    │ Postgres │  │
+               │  │  Binds :3000, :5432   │────► :5432    │  │
+               │  │  on Mac on demand     │    └──────────┘  │
+               │  └──────────▲────────────┘                  │
+               └─────────────┼───────────────────────────────┘
+                             │
+                     :45454 (fixed port)
+                             │
+                ┌────────────▼──────────────┐
+                │    mkenv Container        │
+                │                           │
+                │  ┌──────────────────────┐ │
+                │  │  Proxy Daemon        │ │
+                │  │  :45454         :5432│ │
+                │  └─────────┬──────────▲─┘ │
+                │            │          │   │
+                │            │          │   │
+                │  ┌─────────▼──────────┼─┐ │
+                │  │  npm run dev :3000 │ │ │
+                │  │                    │ │ │
+                │  │  connects to       │ │ │
+                │  │  localhost:5432 ───┘ │ │
+                │  └──────────────────────┘ │
+                └───────────────────────────┘
+
+Flow (Browser → Container App):
+Browser :3000 → mkenv host process (binds :3000 on Mac) →
+:45454 → Proxy daemon → npm run dev :3000
+
+Flow (Container App → Host Port):
+npm run dev connects to localhost:5432 → Proxy daemon →
+:45454 → mkenv host process → Postgres :5432 on Mac
+
+The mkenv host process is the traffic hub. All localhost traffic
+routes through the fixed :45454 port to avoid Docker limitations.</code></pre>
+        <p>The mkenv host process acts as a bidirectional traffic hub between your Mac and the container, using a fixed port (:45454) to avoid Docker's dynamic port limitation.</p>
+        <ul>
+            <li><strong>Browser → Container:</strong> Your browser accesses localhost:3000, which the host process routes to your containerized app</li>
+            <li><strong>Container → Host:</strong> Your containerized app accesses localhost:5432, which routes through the host process to any app on your Mac</li>
+        </ul>
+        <p>Ports are bound <strong>on demand dynamically</strong>. No manual configuration needed.</p>
+        <p><strong>Bonus:</strong> Since all traffic flows through the host process, mkenv logs every connection for audit and analysis. All logging happens offline on your machine - nothing leaves your laptop. This gives you visibility into what your container is actually doing.</p>
+
         <h3>Optional: .mkenv Configuration Files</h3>
         <p>Use <code>.mkenv</code> files to set defaults without repeating command flags:</p>
         <pre><code>{
@@ -234,7 +309,7 @@
         <ul class="steps-list">
           <li>Developers running npm install, pip install, or cargo build regularly</li>
           <li>Teams working on client projects or unfamiliar codebases</li>
-          <li>Anyone using AI coding assistants (Claude Code, Cursor, Copilot)</li>
+          <li>Anyone using AI coding assistants that execute code autonomously</li>
           <li>Security-conscious developers who want isolation without complexity</li>
         </ul>
     </section>

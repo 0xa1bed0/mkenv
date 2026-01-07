@@ -21,7 +21,7 @@
 
 **mkenv** creates isolated Docker development environments in seconds. It automatically detects your project's requirements and builds a complete dev container with the right tools, configs, and caches - without cluttering your host system.
 
-Works with VS Code, Cursor, Neovim, Tmux, and other tools. Zero configuration required.
+Works with Neovim, Tmux, and other tools. Zero configuration required.
 
 ---
 
@@ -90,8 +90,6 @@ Result: **Fresh containers with warm caches**. You can reset or disable caching 
 
 **Infrastructure Tools:**
 * Pulumi
-
-**Coming soon:** VS Code and Cursor extensions for seamless container integration.
 
 ---
 
@@ -212,20 +210,6 @@ This lets you set organization-wide defaults, team preferences, or project-speci
 Exit the shell with `exit` or `Ctrl+D`. The container is removed automatically.
 
 **Note for tmux users:** If you detach from tmux (`Ctrl+b d`) and it's the last attached session, the container will exit and be removed.
-
-### **Use with VS Code**
-
-If the extension is installed:
-
-* Opening a folder triggers an mkenv container if one exists
-* You can open terminals directly inside the container
-
-### **Use with Cursor**
-
-The Cursor extension ensures:
-
-* All agent commands run inside the mkenv container
-* Terminals default to the dev environment
 
 ---
 
@@ -417,13 +401,62 @@ mkenv automatically detects and forwards ports from your container to your host 
 
 ### How It Works
 
-1. When you start mkenv, a lightweight forwarder runs on your host
-2. Inside the container, a daemon monitors for new listening sockets
-3. When your app binds to a port (e.g., `npm run dev` on port 3000), the daemon detects it
-4. The forwarder automatically opens the corresponding host port and routes traffic to the container
-5. Requests are forwarded to your application seamlessly
+```
+┌──────────┐
+│ Browser  │
+│ :3000    │
+└────┬─────┘
+     │
+     │         ┌─────────────────────────────────────────────┐
+     │         │       Your Mac (Host)                       │
+     │         │                                             │
+     │         │  ┌───────────────────────┐                  │
+     │         │  │  mkenv host process   │    ┌──────────┐  │
+     └────────────►                       │    │ Postgres │  │
+               │  │  Binds :3000, :5432   │────► :5432    │  │
+               │  │  on Mac on demand     │    └──────────┘  │
+               │  └──────────▲────────────┘                  │
+               └─────────────┼───────────────────────────────┘
+                             │
+                     :45454 (fixed port)
+                             │
+                ┌────────────▼──────────────┐
+                │    mkenv Container        │
+                │                           │
+                │  ┌──────────────────────┐ │
+                │  │  Proxy Daemon        │ │
+                │  │  :45454         :5432│ │
+                │  └─────────┬──────────▲─┘ │
+                │            │          │   │
+                │            │          │   │
+                │  ┌─────────▼──────────┼─┐ │
+                │  │  npm run dev :3000 │ │ │
+                │  │                    │ │ │
+                │  │  connects to       │ │ │
+                │  │  localhost:5432 ───┘ │ │
+                │  └──────────────────────┘ │
+                └───────────────────────────┘
 
-**Result:** Ports just work. Zero configuration. No Docker quirks.
+Flow (Browser → Container App):
+Browser :3000 → mkenv host process (binds :3000 on Mac) →
+:45454 → Proxy daemon → npm run dev :3000
+
+Flow (Container App → Host Port):
+npm run dev connects to localhost:5432 → Proxy daemon →
+:45454 → mkenv host process → Postgres :5432 on Mac
+
+The mkenv host process is the traffic hub. All localhost traffic
+routes through the fixed :45454 port to avoid Docker limitations.
+```
+
+The mkenv host process acts as a bidirectional traffic hub between your Mac and the container, using a fixed port (:45454) to avoid Docker's dynamic port limitation.
+
+- **Browser → Container:** Your browser accesses localhost:3000, which the host process routes to your containerized app
+- **Container → Host:** Your containerized app accesses localhost:5432, which routes through the host process to any app on your Mac
+
+Ports are bound **on demand dynamically**. No manual configuration needed.
+
+**Bonus:** Since all traffic flows through the host process, mkenv logs every connection for audit and analysis. All logging happens offline on your machine - nothing leaves your laptop. This gives you visibility into what your container is actually doing.
 
 ### Additional Details
 
@@ -480,7 +513,6 @@ https://github.com/0xa1bed0/mkenv/releases/download/latest/checksums.txt
 * Support for more languages, tools, and frameworks
 * In-container management tool for runtime changes
 * Internal refactoring and full test coverage
-* VS Code & Cursor extensions
 * Network lockdown mode
 * Network traffic auditing (inbound and outbound)
 * Safe dependency installation during build 
