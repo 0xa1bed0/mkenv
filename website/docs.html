@@ -11,7 +11,6 @@
     <div class="logo"><a href="index.html">mkenv.sh</a></div>
     <nav>
         <a href="#overview">Overview</a>
-        <a href="#downloads">Downloads</a>
         <a href="#installation">Installation</a>
         <a href="#quickstart">Quickstart</a>
         <a href="#mkenv-files">.mkenv Files</a>
@@ -28,25 +27,6 @@
         <h2>Overview</h2>
         <p>mkenv is a CLI that builds and runs per-project developer containers using Docker with security-focused defaults, disposable sessions, and caching for language tooling. It exists for developers who would rather delete a container than reimage their laptop.</p>
         <p>This documentation covers how to install, run, and configure mkenv. No YAML files required.</p>
-    </section>
-
-    <section id="downloads">
-        <h2>Downloads</h2>
-        <p>Direct download links for mkenv binaries. For specific versions, use semver tags like <code>vX.Y.Z</code>.</p>
-        <div class="download-grid">
-            <div class="download-card">
-                <h3>Latest Release (macOS arm64)</h3>
-                <p>Recommended for most users</p>
-                <a class="download-button primary" href="https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64" target="_blank">Download mkenv</a>
-                <a class="download-button" href="https://github.com/0xa1bed0/mkenv/releases/download/latest/checksums.txt" target="_blank">Checksums</a>
-            </div>
-            <div class="download-card">
-                <h3>All Releases</h3>
-                <p>Browse all versions</p>
-                <a class="download-button" href="https://github.com/0xa1bed0/mkenv/releases" target="_blank">View releases</a>
-                <p>Direct link format: <code>/releases/download/vX.Y.Z/mkenv-darwin-arm64</code></p>
-            </div>
-        </div>
     </section>
 
     <section id="installation">
@@ -309,6 +289,68 @@ claude</code></pre>
         <p>mkenv automatically routes <code>localhost:3000</code> (or any port) from your host machine to the container. Access it from your browser, Postman, or any other tool as usual.</p>
     </section>
 
+    <section id="port-forwarding">
+        <h2>How Port Forwarding Works</h2>
+        <p>Unlike vanilla Docker or Devcontainers, you can't dynamically expose ports from inside a Docker environment — you need to think of exposed ports in advance. mkenv solves this with a bidirectional reverse proxy.</p>
+
+        <h3>Architecture</h3>
+        <pre><code>
+┌──────────────────┐
+│ Browser          │
+│                  │
+│ connects to      │
+│  localhost:3000  │
+└────┬─────────────┘
+     │
+     │           ┌──────────────────────┐
+     │           │  mkenv host process  │    ┌──────────┐
+     └────────────►                     │    │ Postgres │
+                 │  Binds :3000, :5432  │────► :5432    │
+                 │  on Mac on demand    │    └──────────┘
+                 └───────────▲──────────┘
+                             │
+                             │
+                     :45454 (fixed port)
+           ┌─────────────────┼────────────────────┐
+           │    Docker       │                    │
+           │                 │                    │
+           │    ┌────────────▼──────────────┐     │
+           │    │    mkenv Container        │     │
+           │    │                           │     │
+           │    │  ┌──────────────────────┐ │     │
+           │    │  │  Proxy Daemon        │ │     │
+           │    │  │  :45454         :5432│ │     │
+           │    │  └─────────┬──────────▲─┘ │     │
+           │    │            │          │   │     │
+           │    │            │          │   │     │
+           │    │  ┌─────────▼──────────┼─┐ │     │
+           │    │  │  npm run dev :3000 │ │ │     │
+           │    │  │                    │ │ │     │
+           │    │  │  connects to       │ │ │     │
+           │    │  │  localhost:5432 ───┘ │ │     │
+           │    │  └──────────────────────┘ │     │
+           │    └───────────────────────────┘     │
+           │                                      │
+           └──────────────────────────────────────┘
+</code></pre>
+
+        <p>The mkenv host process acts as a bidirectional traffic hub between your host and the container, using a fixed port (:45454) to avoid Docker's dynamic port limitation.</p>
+
+        <h3>How Traffic Flows</h3>
+        <ul>
+            <li><strong>Browser → Container:</strong> Your browser accesses localhost:3000 → mkenv host process logs the request and forwards it to the proxy inside the container → Container proxy forwards to your dev server</li>
+            <li><strong>Container → Host:</strong> Your containerized app accesses localhost:5432 → if port is bound inside container, connects directly; otherwise routes through container proxy → mkenv host process → host service on that port</li>
+        </ul>
+
+        <h3>Key Points</h3>
+        <ul>
+            <li>Ports are bound <strong>on demand</strong> — no manual configuration needed</li>
+            <li>No additional daemons required — the host process starts with <code>mkenv .</code> and dies when you exit</li>
+            <li>All connections are logged locally for audit</li>
+            <li>Nothing leaves your laptop — all logging happens offline</li>
+        </ul>
+    </section>
+
     <section id="policies">
         <h2>Policies &amp; Guardrails</h2>
         <p>mkenv includes a comprehensive policy engine that enforces security guardrails at multiple levels. Policies can be configured globally or per-project using a <code>policy.json</code> file.</p>
@@ -520,6 +562,18 @@ claude</code></pre>
         <p>Yes. You can connect VS Code or Cursor to the mkenv container using their remote development features. This keeps the editor UI on your host while running all commands inside the container.</p>
         <h3>Is there telemetry?</h3>
         <p>No analytics pings. If something breaks, file an issue rather than letting logs spy on you.</p>
+
+        <h3>How do I git push?</h3>
+        <p>Git operations (push, pull, clone) happen on your host machine where your credentials live. Everything else happens in the sandbox. This separates concerns: work runs isolated with no credentials, git operations run on host with credentials and no bloat.</p>
+
+        <h3>How do I install packages that need sudo?</h3>
+        <p>Use <code>mkenv sandbox install &lt;pkg&gt;</code> from inside the container. This is a controlled, audited way to install system packages. You can also specify packages in your <code>.mkenv</code> file with <code>extra_pkgs</code>.</p>
+
+        <h3>What if auto-detection gets my project wrong?</h3>
+        <p>Guide it with CLI options (<code>--langs</code>, <code>--tools</code>), a <code>.mkenv</code> file, or adjust ad-hoc with <code>mkenv sandbox install</code>.</p>
+
+        <h3>IDE integration?</h3>
+        <p>VS Code and Cursor can connect to mkenv containers using their remote development features. Dedicated plugins coming soon.</p>
     </section>
 </div>
 <footer>

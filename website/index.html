@@ -14,8 +14,6 @@
         <a href="#problem">The Problem</a>
         <a href="#what">What is mkenv?</a>
         <a href="#configuration">Configuration</a>
-        <a href="#who">Who Needs This?</a>
-        <a href="#downloads">Download</a>
         <a href="#installation">Install</a>
         <a href="docs.html">Docs</a>
         <a href="https://github.com/0xa1bed0/mkenv" target="_blank">GitHub</a>
@@ -26,9 +24,10 @@
 </div>
 <div class="container">
     <section class="hero" id="overview">
-        <h1>Isolated dev environments in one command</h1>
-        <p>mkenv creates disposable Docker sandboxes that isolate your work and your LLM agents from your laptop. Every npm install, pip install, AI-generated command, and build runs inside a container - not on your host machine where your SSH keys and credentials live.</p>
-        <p><strong>Run one command. Get a safe environment that behaves exactly like localhost. No configuration needed.</strong></p>
+        <h1>Sandboxed dev environments that feel like localhost</h1>
+        <p>mkenv creates disposable Docker containers for your project. No port mapping — ports bind dynamically. No <code>host.docker.internal</code> — localhost just works. No Dockerfile to write — mkenv auto-detects your stack. Sensitive paths like ~/.ssh and ~/.aws are blocked from mounting.</p>
+        <pre><code>cd ~/projects/myapp && mkenv .</code></pre>
+        <p>Your npm install, pip install, LLM agents, and builds run isolated. Your credentials stay on your host.</p>
         <div class="cta-group">
             <a class="cta-primary" href="https://github.com/0xa1bed0/mkenv" target="_blank">View on GitHub</a>
             <a class="cta-secondary" href="#installation">Get Started</a>
@@ -37,271 +36,87 @@
     </section>
 
     <section id="problem">
-        <h2>YEAH, THAT COULD BE YOU</h2>
+        <h2>THE PROBLEM</h2>
         <div class="problem-block">
-            <p>Every experienced developer knows this feeling: your laptop is a graveyard of old runtimes, global installs, random scripts, and half-forgotten projects. And every time you run an install command or setup script, you're quietly gambling with your entire machine. Now add LLM coding agents into the mix - executing commands you barely skim before hitting enter.</p>
-            <p>I lost that gamble.</p>
-            <p>One innocent-looking npm install - and suddenly I was rotating hundreds of passwords, revoking tokens, resetting SSH keys, reissuing cloud credentials, and eventually nuking my Mac because I had no idea what was touched.</p>
-            <p>And the painful part? I always knew I should be using isolated dev environments. But the moment I open a devcontainer.json or start thinking about a Dockerfile for local dev, my brain screams "not today".</p>
-            <p><strong>That's exactly the pain mkenv removes. One command. Safe environment for you and your LLM. No thinking. No disaster recovery next week.</strong></p>
+            <p>Every time we talk security and isolation we mean tradeoffs:</p>
+            <ul>
+              <li><strong>Ports need advance planning</strong> — Docker requires you to declare ports upfront. Spin up a server on :8080 mid-session? Restart the whole container.</li>
+              <li><strong>localhost doesn't work</strong> — Everything becomes <code>host.docker.internal</code>. Your scripts break. Your configs break. Your muscle memory breaks.</li>
+              <li><strong>New languages to learn</strong> — Dockerfile, docker-compose.yml, devcontainer.json. Each with its own syntax, quirks, and gotchas. More files to maintain.</li>
+              <li><strong>Docker security is its own field</strong> — Privileged mode, capabilities, seccomp profiles, user namespaces. Get it wrong and your "isolation" is theater.</li>
+              <li><strong>Setup complexity</strong> — Hours of configuration before you write a line of code. Then maintain it as your project evolves.</li>
+              <li><strong>Tooling overhead</strong> — Your debugger needs remote config. Your terminal multiplexer needs setup. Everything needs one more step.</li>
+              <li>Many more (you name it)</li>
+            </ul>
+
+            <p>Every developer understands they need isolation. But every day, when it's time to actually set it up, your brain screams "not today." So you run <code>npm install</code> on your host machine. Again.</p>
+
+            <p>We postpone security until something breaks. That's human nature.</p>
+
+            <p>Risk isn't hypothetical:</p>
+            <ul>
+                <li><strong>XZ Utils Backdoor</strong> — Core Linux library backdoored to tamper with SSH</li>
+                <li><strong>Shai-Hulud npm worm</strong> — Self-spreading malware that backdoored hundreds of packages</li>
+                <li><strong>PyTorch dependency confusion</strong> — Fake package exfiltrated SSH keys</li>
+            </ul>
+            <p><a href="attacks.html" target="_blank">See 14 more documented attacks →</a></p>
         </div>
-    </section>
-
-    <section id="truth">
-        <h3>THE UGLY TRUTH: YOUR LAPTOP CONTAINS MORE THAN YOU THINK</h3>
-            <p>Your development machine silently holds:</p>
-            <ul>
-                <li>SSH keys</li>
-                <li>GitHub and cloud tokens</li>
-                <li>browser cookies that bypass 2FA</li>
-                <li>password vaults</li>
-                <li>crypto wallets</li>
-                <li>personal documents</li>
-                <li>production credentials</li>
-            </ul>
-            <p>And you regularly run code that can access all of it:</p>
-            <ul>
-                <li>AI-generated commands you barely skim before executing</li>
-                <li>LLM agents running npm/pip/cargo installs autonomously</li>
-                <li>install scripts and postinstall hooks</li>
-                <li>transitive dependencies (dependencies of dependencies)</li>
-                <li>build steps running arbitrary code</li>
-                <li>dev server boot scripts</li>
-            </ul>
-            <p>One wrong dependency is enough to lose everything.</p>
-
-            <h3>Real Supply Chain Attacks</h3>
-            <p>These aren't hypotheticals. They already happened, in the ecosystems we use daily:</p>
-            <ol>
-                <li>
-                  <p><strong>React RCE Vulnerability</strong> — [RCE] [Dependency Chain]</p>
-                  <p>CVE-2025-55182 – React Server Components RCE via Flight Payload Deserialization</p>
-                  <p><a href="https://react.dev/blog/2025/12/03/critical-security-vulnerability-in-react-server-components" target="_blank">https://react.dev/blog/2025/12/03/critical-security-vulnerability-in-react-server-components</a></p>
-                </li>
-                <li>
-                  <p><strong>Shai-Hulud 2.0</strong> — [Supply Chain] [Credential Theft] [Self-Propagation]</p>
-                  <p>Updated version of the npm worm that backdoored hundreds of legitimate packages.</p>
-                  <p><a href="https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/" target="_blank">https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/</a></p>
-                </li>
-                <li>
-                    <p><strong>XZ Utils Backdoor</strong> — [Supply Chain] [RCE]</p>
-                    <p>A core Linux library was backdoored to tamper with SSH authentication globally.</p>
-                    <p><a href="https://arxiv.org/abs/2504.17473" target="_blank">https://arxiv.org/abs/2504.17473</a></p>
-                </li>
-            </ol>
-
-            <details class="spoiler">
-                <summary>12 more documented attacks (click to expand)</summary>
-                <div class="spoiler-content">
-                    <ol start="4">
-                        <li>
-                            <p><strong>Shai-Hulud 1.0</strong> — [Supply Chain] [Credential Theft] [Self-Propagation]</p>
-                            <p>Original self-spreading npm worm that stole tokens and auto-published malware.</p>
-                            <p><a href="https://www.blackduck.com/blog/npm-malware-attack-shai-hulud-threat.html" target="_blank">https://www.blackduck.com/blog/npm-malware-attack-shai-hulud-threat.html</a></p>
-                        </li>
-                        <li>
-                            <p>NPM SSH-Key Stealers — [Credential Theft] [Postinstall Malware]</p>
-                            <p>Malicious postinstall scripts read ~/.ssh/id_rsa and uploaded it to attackers.</p>
-                            <p><a href="https://www.scworld.com/news/github-npm-registry-abused-to-host-ssh-key-stealing-malware" target="_blank">https://www.scworld.com/news/github-npm-registry-abused-to-host-ssh-key-stealing-malware</a></p>
-                        </li>
-                        <li>
-                            <p>PyTorch Dependency Confusion — [Supply Chain] [Credential Theft]</p>
-                            <p>A fake PyPI package exfiltrated SSH keys and tokens.</p>
-                            <p><a href="https://pytorch.org/blog/compromised-nightly-dependency/" target="_blank">https://pytorch.org/blog/compromised-nightly-dependency/</a></p>
-                        </li>
-                        <li>
-                            <p>colors.js / faker.js Sabotage — [Sabotage]</p>
-                            <p>The maintainer intentionally broke the world with malicious updates.</p>
-                            <p><a href="https://fossa.com/blog/npm-packages-colors-faker-corrupted/" target="_blank">https://fossa.com/blog/npm-packages-colors-faker-corrupted/</a></p>
-                        </li>
-                        <li>
-                            <p>Codecov Bash Uploader — [CI Compromise] [Credential Theft]</p>
-                            <p>A compromised CI script exfiltrated secrets from thousands of CI pipelines.</p>
-                            <p><a href="https://about.codecov.io/security-update/" target="_blank">https://about.codecov.io/security-update/</a></p>
-                        </li>
-                        <li>
-                            <p>PHP Git Server Backdoor — [RCE] [Account Takeover]</p>
-                            <p>Attackers pushed commits enabling RCE via HTTP headers.</p>
-                            <p><a href="https://news-web.php.net/php.internals/113838" target="_blank">https://news-web.php.net/php.internals/113838</a></p>
-                        </li>
-                        <li>
-                            <p>UA-Parser-JS Hijack — [Account Takeover] [Credential Theft] [Cryptominer]</p>
-                            <p>Stolen maintainer creds published malicious versions.</p>
-                            <p><a href="https://github.com/advisories/GHSA-pjwm-rvh2-c87w" target="_blank">https://github.com/advisories/GHSA-pjwm-rvh2-c87w</a></p>
-                        </li>
-                        <li>
-                            <p>Log4Shell — [RCE] [Ecosystem-Wide Vulnerability]</p>
-                            <p>A logging string triggered RCE in millions of Java systems.</p>
-                            <p><a href="https://en.wikipedia.org/wiki/Log4Shell" target="_blank">https://en.wikipedia.org/wiki/Log4Shell</a></p>
-                        </li>
-                        <li>
-                            <p>event-stream — [Supply Chain] [Credential Theft]</p>
-                            <p>A fake maintainer added a dependency stealing crypto wallets.</p>
-                            <p><a href="https://github.com/dominictarr/event-stream/issues/116" target="_blank">https://github.com/dominictarr/event-stream/issues/116</a></p>
-                        </li>
-                        <li>
-                            <p>ESLint-Scope — [Account Takeover] [Credential Theft]</p>
-                            <p>Breached maintainer account published malicious versions.</p>
-                            <p><a href="https://eslint.org/blog/2018/07/postmortem-for-malicious-package-publishes/" target="_blank">https://eslint.org/blog/2018/07/postmortem-for-malicious-package-publishes/</a></p>
-                        </li>
-                        <li>
-                            <p>RubyGems Backdoored Packages — [Supply Chain] [Credential Theft]</p>
-                            <p>Popular gems were replaced with malicious versions.</p>
-                            <p><a href="https://www.helpnetsecurity.com/2019/08/21/backdoored-ruby-gems/" target="_blank">https://www.helpnetsecurity.com/2019/08/21/backdoored-ruby-gems/</a></p>
-                        </li>
-                        <li>
-                            <p>npm Typosquatting — [Social Engineering]</p>
-                            <p>Misspelled packages harvested AWS keys and env vars.</p>
-                            <p><a href="https://docs.npmjs.com/threats-and-mitigations" target="_blank">https://docs.npmjs.com/threats-and-mitigations</a></p>
-                        </li>
-                        <li>
-                            <p>Octopus Scanner — [Build System Infection]</p>
-                            <p>Malware infected repos so every build produced compromised artifacts.</p>
-                            <p><a href="https://github.blog/security/vulnerability-research/the-octopus-scanner-malware-attacking-the-open-source-supply-chain/" target="_blank">https://github.blog/security/vulnerability-research/the-octopus-scanner-malware-attacking-the-open-source-supply-chain/</a></p>
-                        </li>
-                        <li>
-                            <p>XcodeGhost — [IDE Infection]</p>
-                            <p>Trojanized Xcode infected every iOS app built with it.</p>
-                            <p><a href="https://unit42.paloaltonetworks.com/novel-malware-xcodeghost-modifies-xcode-infects-apple-ios-apps-and-hits-app-store/" target="_blank">https://unit42.paloaltonetworks.com/novel-malware-xcodeghost-modifies-xcode-infects-apple-ios-apps-and-hits-app-store/</a></p>
-                        </li>
-                    </ol>
-                </div>
-            </details>
     </section>
 
     <section id="what">
         <h2>WHAT IS MKENV?</h2>
-        <p>mkenv is a CLI tool that creates isolated Docker environments where both you and your LLM coding agents work safely - away from your credentials and host OS.</p>
+        <p>Security always comes with a cost — configuration, changed workflows, things that break. mkenv aims to pay that cost for you. It's a CLI that generates hardened Docker environments from your project, handling security configuration, port forwarding, and path blocking so you don't have to.</p>
 
-        <p><strong>Think of it as localhost, but actually isolated:</strong></p>
+        <p><strong>mkenv gives you:</strong></p>
         <ul>
-            <li>Your LLM agents run commands inside mkenv - not on your real machine</li>
-            <li>Every <code>npm install</code>, <code>pip install</code>, and AI-generated script executes in the sandbox</li>
-            <li>The environment behaves exactly like your normal localhost - servers, databases, builds all work normally</li>
-            <li>But it can't access your SSH keys, browser sessions, tokens, or files outside the project</li>
-            <li>Your host OS and other applications stay completely unreachable - no system-level damage possible</li>
+            <li><strong>Auto-detection:</strong> Scans your project, detects runtimes (Node, Go, etc.), builds environment automatically. No configuration required.</li>
+            <li><strong>Isolated execution:</strong> Your LLM agents and <code>npm install</code> run inside the sandbox, not on your host.</li>
+            <li><strong>Localhost behavior:</strong> No port configuration, no <code>host.docker.internal</code>. Just use <code>localhost</code> as always.</li>
+            <li><strong>Blocked sensitive paths:</strong> Can't mount ~/.ssh, ~/.aws, ~/.docker, browser profiles, password managers, and many more - even accidentally.</li>
+            <li><strong>Pre-flight secret scan:</strong> Before starting, mkenv scans your project for .env files, API keys, private keys, and prompts you to confirm.</li>
+            <li><strong>Network audit:</strong> All traffic logged locally. System-critical ports blocked by default.</li>
+            <li><strong>Policy engine:</strong> Protects developers from accidental wrong moves. Teams can enforce their own rules — restrict tools, block ports, limit mount paths.</li>
         </ul>
 
-        <h3>How "Works Like Localhost" Actually Works</h3>
-        <pre><code>
-┌──────────┐
-│ Browser  │
-│ :3000    │
-└────┬─────┘
-     │
-     │         ┌─────────────────────────────────────────────┐
-     │         │       Your Mac (Host)                       │
-     │         │                                             │
-     │         │  ┌───────────────────────┐                  │
-     │         │  │  mkenv host process   │    ┌──────────┐  │
-     └────────────►                       │    │ Postgres │  │
-               │  │  Binds :3000, :5432   │────► :5432    │  │
-               │  │  on Mac on demand     │    └──────────┘  │
-               │  └──────────▲────────────┘                  │
-               └─────────────┼───────────────────────────────┘
-                             │
-                     :45454 (fixed port)
-                             │
-                ┌────────────▼──────────────┐
-                │    mkenv Container        │
-                │                           │
-                │  ┌──────────────────────┐ │
-                │  │  Proxy Daemon        │ │
-                │  │  :45454         :5432│ │
-                │  └─────────┬──────────▲─┘ │
-                │            │          │   │
-                │            │          │   │
-                │  ┌─────────▼──────────┼─┐ │
-                │  │  npm run dev :3000 │ │ │
-                │  │                    │ │ │
-                │  │  connects to       │ │ │
-                │  │  localhost:5432 ───┘ │ │
-                │  └──────────────────────┘ │
-                └───────────────────────────┘
+        <h3>Ports just work</h3>
+        <p>Run <code>npm run dev</code> inside the sandbox, access it at localhost:3000 in your browser. Run Postgres on your host, access it at localhost:5432 from inside. Bidirectional, on-demand, no configuration. <a href="docs.html#port-forwarding">How it works →</a></p>
 
-Flow (Browser → Container App):
-Browser :3000 → mkenv host process (binds :3000 on Mac) →
-:45454 → Proxy daemon → npm run dev :3000
-
-Flow (Container App → Host Port):
-npm run dev connects to localhost:5432 → Proxy daemon →
-:45454 → mkenv host process → Postgres :5432 on Mac
-
-The mkenv host process is the traffic hub. All localhost traffic
-routes through the fixed :45454 port to avoid Docker limitations.</code></pre>
-        <p>The mkenv host process acts as a bidirectional traffic hub between your Mac and the container, using a fixed port (:45454) to avoid Docker's dynamic port limitation.</p>
+        <h3>What makes mkenv environment hardened</h3>
         <ul>
-            <li><strong>Browser → Container:</strong> Your browser accesses localhost:3000, which the host process routes to your containerized app</li>
-            <li><strong>Container → Host:</strong> Your containerized app accesses localhost:5432, which routes through the host process to any app on your Mac</li>
+            <li>Runs as non-root user — no sudo in sandbox</li>
+            <li>Shell history never stores tokens, keys, secrets</li>
+            <li>Critical paths physically blocked from mounting (even if you try)</li>
+            <li>Container destroyed on exit — compromised system can't persist</li>
+            <li>Only trusted base images used</li>
+            <li>Dangerous actions require explicit approval (installing packages, mounting paths, accessing secrets)</li>
         </ul>
-        <p>Ports are bound <strong>on demand dynamically</strong>. No manual configuration needed.</p>
-        <p><strong>Bonus:</strong> Since all traffic flows through the host process, mkenv logs every connection for audit and analysis. All logging happens offline on your machine - nothing leaves your laptop.</p>
+        <p>Your workstation runs only Docker, a browser, and the mkenv binary. All dev tools, runtimes, and dependencies stay inside the container.</p>
+    </section>
 
-        <h3>How LLM Isolation Works</h3>
-        <pre><code>host$ mkenv . --tools claude
-# mkenv builds container with claude CLI installed
-# drops you into the container shell
-
-container$ claude "install dependencies and set up database"
-# Claude runs npm install, pip install, executes setup scripts
-# All inside the isolated environment
-
-container$ # AI generates a bad command or malicious package runs
-container$ # rm -rf / happens, environment breaks - no problem
-
-container$ exit
-
-host$ mkenv .
-# Fresh container in seconds. Your Mac stays untouched.
-</code></pre>
-        <p>When your LLM executes code, installs packages, or runs scripts - everything stays in the container. Your SSH keys, tokens, browser sessions, and <strong>your host OS</strong> stay on your Mac, completely unreachable.</p>
-        <p>Something breaks? Exit and restart. The container is disposable. Your machine isn't.</p>
-
-        <h3>See It In Action</h3>
-        <p>Watch mkenv protect your machine from a malicious supply chain attack and recover in seconds:</p>
-        <div id="demo-container" style="margin: 20px 0;">
-            <script id="asciicast-guETW9BSEyUe1UEXQ3hyVH9eo" src="https://asciinema.org/a/guETW9BSEyUe1UEXQ3hyVH9eo.js" async></script>
-        </div>
-
-        <p><strong>How it works:</strong></p>
-        <ol>
-            <li>Run <code>mkenv .</code> in your project folder</li>
-            <li>mkenv detects your languages, tools, and dependencies automatically</li>
-            <li>It generates and builds a Docker container with everything you need</li>
-            <li>You're dropped into the isolated environment</li>
-            <li>Work normally - servers bind to ports, files sync, everything behaves like localhost</li>
-            <li>All network activity and package installs are logged</li>
-            <li>No sudo access - use <code>mkenv sandbox</code> for system changes</li>
-            <li>Exit when done - the container is destroyed</li>
-        </ol>
-        <p><strong>Result:</strong> You get the convenience of localhost with the safety of isolation. Your LLM agent has full freedom to execute code, install packages, and run builds - without access to your real credentials.</p>
-
-        <h3>Security Model</h3>
-        <ul>
-            <li>Runs as non-root user inside the container</li>
-            <li>Only your project folder is accessible - no access to SSH keys, tokens, credentials, or your host OS</li>
-            <li>Your system stays protected - malicious code can't damage your OS or other applications</li>
-            <li>All network requests and package installs are logged</li>
-            <li>Container state is temporary - nothing persists after you exit</li>
-            <li>System changes require explicit approval via <code>mkenv sandbox</code></li>
-        </ul>
-        <p><strong>If something malicious runs, delete the container and start fresh. Your real machine stays untouched.</strong></p>
+    <section id="comparison">
+        <h2>HOW IS THIS DIFFERENT?</h2>
+        <p><strong>vs Devcontainers:</strong> No Dockerfile or devcontainer.json to write. Ports bind dynamically without configuration. Security guardrails are built-in — you can't accidentally mount ~/.ssh even if you try.</p>
+        <p><strong>vs plain Docker:</strong> With Docker you build and maintain your environment from scratch, learning security quirks along the way. mkenv auto-detects your project, handles port forwarding bidirectionally, and bakes in security defaults. No Dockerfile to write or maintain.</p>
+        <p><strong>vs Nix/Devbox:</strong> Those manage your toolchain but run code on your host. mkenv runs everything in a container — actual isolation, not just reproducibility.</p>
+        <p><strong>vs all of them:</strong> mkenv has a policy engine. Developers are protected from accidental mistakes (mounting credentials, exposing dangerous ports). Teams can enforce their own rules. None of the alternatives have this built-in.</p>
+        <p><strong>Audit trail:</strong> mkenv logs everything — network connections, port bindings, package installs, system changes. Full audit trail stored locally. When something goes wrong, you know exactly what happened.</p>
     </section>
 
     <section id="configuration">
         <h2>ADVANCED CONFIGURATION (OPTIONAL)</h2>
-        <p>mkenv works with zero configuration. These options are for teams or advanced use cases.</p>
+        <p>Most projects need zero configuration — mkenv auto-detects your stack. When you do need to customize, we keep it minimal. No new DSL to learn, no 500-line YAML files.</p>
 
         <h3>.mkenv Configuration Files</h3>
-        <p>Customize project defaults without repeating command-line flags. Place <code>.mkenv</code> files in your project root or parent directories for team-wide settings.</p>
+        <p>Customize project defaults without repeating command-line flags. Place <code>.mkenv</code> files in your project root or parent directories for multi-project settings.</p>
+        <p>Bricks are atomic building blocks that mkenv uses to generate your environment — things like <code>claude-code</code>, <code>nvim</code>, <code>node</code>, <code>go</code>.</p>
         <pre><code>{
   "enabled_bricks": ["claude", "nvim"],
   "volumes": ["~/data:/data"]
 }</code></pre>
         <p><a href="docs.html#mkenv-files">Full .mkenv documentation →</a></p>
 
-        <h3>Policy Configuration (Teams)</h3>
-        <p>Enforce organization-wide security policies using <code>policy.json</code>. Control which tools can be used, restrict mount paths, and manage port access.</p>
+        <h3>Policy Configuration</h3>
+        <p>Enforce security policies using <code>policy.json</code>. Control which tools can be used, restrict mount paths, and manage port access.</p>
         <pre><code>{
   "disabled_bricks": ["codex"],
   "allowed_project_path": "/home/user/projects",
@@ -314,37 +129,6 @@ host$ mkenv .
 
         <h3>More Documentation</h3>
         <p>See the <a href="docs.html">full documentation</a> for commands, bricks, troubleshooting, and advanced features.</p>
-    </section>
-
-    <section id="who">
-        <h2>WHO NEEDS THIS?</h2>
-        <ul class="steps-list">
-          <li>Developers running npm install, pip install, or cargo build regularly</li>
-          <li>Teams working on client projects or unfamiliar codebases</li>
-          <li>Anyone using AI coding assistants that execute code autonomously</li>
-          <li>Security-conscious developers who want isolation without complexity</li>
-        </ul>
-    </section>
-
-    <section id="downloads">
-        <h2>DOWNLOADS</h2>
-        <div class="note">
-            <strong>Platform Support:</strong> Currently macOS arm64 only. Linux support is in development. Windows support planned via WSL.
-        </div>
-        <div class="download-grid">
-            <div class="download-card">
-                <h3>Latest Release</h3>
-                <p>Recommended for most users</p>
-                <a class="download-button primary" href="https://github.com/0xa1bed0/mkenv/releases/download/latest/mkenv-darwin-arm64" target="_blank">Download mkenv</a>
-                <a class="download-button" href="https://github.com/0xa1bed0/mkenv/releases/download/latest/checksums.txt" target="_blank">Checksums</a>
-            </div>
-            <div class="download-card">
-                <h3>All Releases</h3>
-                <p>Browse all versions</p>
-                <a class="download-button" href="https://github.com/0xa1bed0/mkenv/releases" target="_blank">View releases</a>
-                <p>Direct link format: <code>/releases/download/vX.Y.Z/mkenv-darwin-arm64</code></p>
-            </div>
-        </div>
     </section>
 
     <section id="installation">
@@ -376,7 +160,7 @@ mkenv .</code></pre>
         <h2>BUILT BY DEVELOPERS WHO GOT BURNED</h2>
         <p>We're not a big corporation or Security Enterprise Platform™.</p>
         <p>We're developers who got burned by supply chain attacks and built the tool we wish we had.</p>
-        <p>If you've been thinking "I should really isolate my dev environment but it's too much work" - this is for you.</p>
+        <p>If you've been thinking "I should really isolate my dev environment but it's too much work" — this is for you.</p>
         <p><strong><a href="https://github.com/0xa1bed0/mkenv" target="_blank">Star mkenv on GitHub</a></strong></p>
     </section>
 </div>

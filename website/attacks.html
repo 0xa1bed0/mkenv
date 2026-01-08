@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supply Chain Attacks | mkenv</title>
+<link rel="stylesheet" href="./styles.css?v=1">
+</head>
+<body>
+<header>
+    <div class="logo"><a href="index.html">mkenv.sh</a></div>
+    <nav>
+        <a href="index.html#problem">← Back to mkenv</a>
+    </nav>
+</header>
+<div class="container">
+    <section>
+        <h1>Supply Chain Attack Examples</h1>
+        <p>Real attacks, real ecosystems, real damage. This is why isolation matters.</p>
+
+        <ol>
+            <li>
+                <p><strong>React RCE Vulnerability</strong> — [RCE] [Dependency Chain]</p>
+                <p>CVE-2025-55182 – React Server Components RCE via Flight Payload Deserialization</p>
+                <p><a href="https://react.dev/blog/2025/12/03/critical-security-vulnerability-in-react-server-components" target="_blank">react.dev/blog/2025/12/03/critical-security-vulnerability-in-react-server-components</a></p>
+            </li>
+            <li>
+                <p><strong>Shai-Hulud 2.0</strong> — [Supply Chain] [Credential Theft] [Self-Propagation]</p>
+                <p>Updated version of the npm worm that backdoored hundreds of legitimate packages.</p>
+                <p><a href="https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/" target="_blank">securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/</a></p>
+            </li>
+            <li>
+                <p><strong>XZ Utils Backdoor</strong> — [Supply Chain] [RCE]</p>
+                <p>A core Linux library was backdoored to tamper with SSH authentication globally.</p>
+                <p><a href="https://arxiv.org/abs/2504.17473" target="_blank">arxiv.org/abs/2504.17473</a></p>
+            </li>
+            <li>
+                <p><strong>Shai-Hulud 1.0</strong> — [Supply Chain] [Credential Theft] [Self-Propagation]</p>
+                <p>Original self-spreading npm worm that stole tokens and auto-published malware.</p>
+                <p><a href="https://www.blackduck.com/blog/npm-malware-attack-shai-hulud-threat.html" target="_blank">blackduck.com/blog/npm-malware-attack-shai-hulud-threat.html</a></p>
+            </li>
+            <li>
+                <p><strong>NPM SSH-Key Stealers</strong> — [Credential Theft] [Postinstall Malware]</p>
+                <p>Malicious postinstall scripts read ~/.ssh/id_rsa and uploaded it to attackers.</p>
+                <p><a href="https://www.scworld.com/news/github-npm-registry-abused-to-host-ssh-key-stealing-malware" target="_blank">scworld.com/news/github-npm-registry-abused-to-host-ssh-key-stealing-malware</a></p>
+            </li>
+            <li>
+                <p><strong>PyTorch Dependency Confusion</strong> — [Supply Chain] [Credential Theft]</p>
+                <p>A fake PyPI package exfiltrated SSH keys and tokens.</p>
+                <p><a href="https://pytorch.org/blog/compromised-nightly-dependency/" target="_blank">pytorch.org/blog/compromised-nightly-dependency/</a></p>
+            </li>
+            <li>
+                <p><strong>colors.js / faker.js Sabotage</strong> — [Sabotage]</p>
+                <p>The maintainer intentionally broke the world with malicious updates.</p>
+                <p><a href="https://fossa.com/blog/npm-packages-colors-faker-corrupted/" target="_blank">fossa.com/blog/npm-packages-colors-faker-corrupted/</a></p>
+            </li>
+            <li>
+                <p><strong>Codecov Bash Uploader</strong> — [CI Compromise] [Credential Theft]</p>
+                <p>A compromised CI script exfiltrated secrets from thousands of CI pipelines.</p>
+                <p><a href="https://about.codecov.io/security-update/" target="_blank">about.codecov.io/security-update/</a></p>
+            </li>
+            <li>
+                <p><strong>PHP Git Server Backdoor</strong> — [RCE] [Account Takeover]</p>
+                <p>Attackers pushed commits enabling RCE via HTTP headers.</p>
+                <p><a href="https://news-web.php.net/php.internals/113838" target="_blank">news-web.php.net/php.internals/113838</a></p>
+            </li>
+            <li>
+                <p><strong>UA-Parser-JS Hijack</strong> — [Account Takeover] [Credential Theft] [Cryptominer]</p>
+                <p>Stolen maintainer creds published malicious versions.</p>
+                <p><a href="https://github.com/advisories/GHSA-pjwm-rvh2-c87w" target="_blank">github.com/advisories/GHSA-pjwm-rvh2-c87w</a></p>
+            </li>
+            <li>
+                <p><strong>Log4Shell</strong> — [RCE] [Ecosystem-Wide Vulnerability]</p>
+                <p>A logging string triggered RCE in millions of Java systems.</p>
+                <p><a href="https://en.wikipedia.org/wiki/Log4Shell" target="_blank">en.wikipedia.org/wiki/Log4Shell</a></p>
+            </li>
+            <li>
+                <p><strong>event-stream</strong> — [Supply Chain] [Credential Theft]</p>
+                <p>A fake maintainer added a dependency stealing crypto wallets.</p>
+                <p><a href="https://github.com/dominictarr/event-stream/issues/116" target="_blank">github.com/dominictarr/event-stream/issues/116</a></p>
+            </li>
+            <li>
+                <p><strong>ESLint-Scope</strong> — [Account Takeover] [Credential Theft]</p>
+                <p>Breached maintainer account published malicious versions.</p>
+                <p><a href="https://eslint.org/blog/2018/07/postmortem-for-malicious-package-publishes/" target="_blank">eslint.org/blog/2018/07/postmortem-for-malicious-package-publishes/</a></p>
+            </li>
+            <li>
+                <p><strong>RubyGems Backdoored Packages</strong> — [Supply Chain] [Credential Theft]</p>
+                <p>Popular gems were replaced with malicious versions.</p>
+                <p><a href="https://www.helpnetsecurity.com/2019/08/21/backdoored-ruby-gems/" target="_blank">helpnetsecurity.com/2019/08/21/backdoored-ruby-gems/</a></p>
+            </li>
+            <li>
+                <p><strong>npm Typosquatting</strong> — [Social Engineering]</p>
+                <p>Misspelled packages harvested AWS keys and env vars.</p>
+                <p><a href="https://docs.npmjs.com/threats-and-mitigations" target="_blank">docs.npmjs.com/threats-and-mitigations</a></p>
+            </li>
+            <li>
+                <p><strong>Octopus Scanner</strong> — [Build System Infection]</p>
+                <p>Malware infected repos so every build produced compromised artifacts.</p>
+                <p><a href="https://github.blog/security/vulnerability-research/the-octopus-scanner-malware-attacking-the-open-source-supply-chain/" target="_blank">github.blog/security/vulnerability-research/the-octopus-scanner-malware...</a></p>
+            </li>
+            <li>
+                <p><strong>XcodeGhost</strong> — [IDE Infection]</p>
+                <p>Trojanized Xcode infected every iOS app built with it.</p>
+                <p><a href="https://unit42.paloaltonetworks.com/novel-malware-xcodeghost-modifies-xcode-infects-apple-ios-apps-and-hits-app-store/" target="_blank">unit42.paloaltonetworks.com/novel-malware-xcodeghost...</a></p>
+            </li>
+        </ol>
+
+        <p><a href="index.html#problem">← Back to mkenv</a></p>
+    </section>
+</div>
+<footer>
+  mkenv &middot; Elastic License 2.0 &middot; Built by <a href="https://albedohq.com" target="_blank">paranoid devs</a>
+</footer>
+</body>
+</html>
