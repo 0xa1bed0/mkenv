@@ -107,6 +107,29 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 		lines = append(lines, `RUN ["mkdir", "-p", "`+path+`"]`)
 	}
 
+	// Cache files are stored in a dedicated volume directory and symlinked
+	// to their expected paths. This works around Docker volumes being directories.
+	// All cached files go into a single directory that gets mounted as a volume.
+	cacheFileStoreDir := ""
+	if len(plan.cacheFilePaths) > 0 {
+		cacheFileStoreDir = replaceVars("${MKENV_HOME}/.mkenv-file-cache", plan.args)
+		lines = append(lines, `RUN ["mkdir", "-p", "`+cacheFileStoreDir+`"]`)
+
+		for _, cf := range plan.cacheFilePaths {
+			originalPath := replaceVars(cf, plan.args)
+			fileName := originalPath[strings.LastIndex(originalPath, "/")+1:]
+			cachedPath := cacheFileStoreDir + "/" + fileName
+
+			// Create the file in the cache directory and symlink from original location
+			lines = append(lines, `RUN ["touch", "`+cachedPath+`"]`)
+
+			// Ensure parent directory of symlink exists and create symlink
+			parentDir := originalPath[:strings.LastIndex(originalPath, "/")]
+			lines = append(lines, `RUN ["mkdir", "-p", "`+parentDir+`"]`)
+			lines = append(lines, `RUN ["ln", "-sf", "`+cachedPath+`", "`+originalPath+`"]`)
+		}
+	}
+
 	// Entrypoint/Cmd
 	if len(plan.entrypoint) > 0 {
 		lines = append(lines, "", "# ───────────────────────────────────────────")
@@ -129,6 +152,11 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 
 	if len(cacheFoldersPaths) > 0 {
 		lines = append(lines, fmt.Sprintf("LABEL mkenv_cache_volumes=\"%s\"", strings.Join(cacheFoldersPaths, ",")))
+	}
+
+	// Cache files directory is stored as a single volume path
+	if cacheFileStoreDir != "" {
+		lines = append(lines, fmt.Sprintf("LABEL mkenv_cache_file_store=\"%s\"", cacheFileStoreDir))
 	}
 
 	lines = append(lines, "LABEL mkenv=true")

@@ -36,6 +36,7 @@ func NewCodex(metadata map[string]string) (bricksengine.Brick, error) {
 		bricksengine.WithKind(bricksengine.BrickKindCommon),
 		bricksengine.WithBrick(nodeBrick),
 		bricksengine.WithCacheFolder("${MKENV_HOME}/.npm"),
+		bricksengine.WithCacheFolder("${MKENV_HOME}/.codex"),
 		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
 			Argv: []string{"/bin/bash", "-lc", fmt.Sprintf(`set -eo pipefail

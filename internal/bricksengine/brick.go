@@ -8,6 +8,7 @@ import (
 
 type (
 	CacheFoldersPaths []string
+	CacheFilesPaths   []string
 )
 
 type Brick interface {
@@ -26,6 +27,7 @@ type Brick interface {
 	PackageManager() PackageManager
 
 	CacheFolders() CacheFoldersPaths
+	CacheFiles() CacheFilesPaths
 
 	Entrypoint() []string
 	AttachInstruction() []string
@@ -79,6 +81,7 @@ type brick struct {
 	packageManager PackageManager
 
 	cacheFolders CacheFoldersPaths
+	cacheFiles   CacheFilesPaths
 
 	entrypoint        []string
 	cmd               []string
@@ -98,6 +101,7 @@ func (b *brick) PackageRequests() []PackageRequest {
 }
 
 func (b *brick) CacheFolders() CacheFoldersPaths { return copyStrings(b.cacheFolders) }
+func (b *brick) CacheFiles() CacheFilesPaths     { return copyStrings(b.cacheFiles) }
 func (b *brick) PackageManager() PackageManager  { return b.packageManager }
 func (b *brick) Entrypoint() []string            { return copyStrings(b.entrypoint) }
 func (b *brick) AttachInstruction() []string     { return copyStrings(b.attachInstruction) }

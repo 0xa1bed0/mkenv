@@ -155,6 +155,20 @@ func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Pr
 		})
 	}
 
+	// Resolve cache file store (single volume for all cached files)
+	cacheFileStore, err := dc.resolveCacheFileStore(ctx, imageTag, project)
+	if err != nil {
+		return
+	}
+
+	if cacheFileStore != nil {
+		hostCfg.Mounts = append(hostCfg.Mounts, mount.Mount{
+			Type:   mount.TypeVolume,
+			Source: cacheFileStore.Name,
+			Target: cacheFileStore.MountPath,
+		})
+	}
+
 	created, err := dc.client.ContainerCreate(ctx, cfg, hostCfg, nil, nil, resolveContainerName(project.Name()))
 	if err != nil {
 		return

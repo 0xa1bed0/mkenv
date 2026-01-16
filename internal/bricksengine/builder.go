@@ -49,6 +49,22 @@ func WithCacheFolder(folder string) BrickOption {
 	}
 }
 
+func WithCacheFiles(files CacheFilesPaths) BrickOption {
+	return func(bi *brick) error {
+		bi.cacheFiles = append(bi.cacheFiles, files...)
+
+		return nil
+	}
+}
+
+func WithCacheFile(file string) BrickOption {
+	return func(bi *brick) error {
+		bi.cacheFiles = append(bi.cacheFiles, file)
+
+		return nil
+	}
+}
+
 func WithKind(kind BrickKind) BrickOption {
 	return func(bi *brick) error {
 		kinds := append(bi.kinds.All(), kind)
@@ -226,6 +242,7 @@ func WithBrick(b Brick) BrickOption {
 		WithEntrypoint(b.Entrypoint(), b.AttachInstruction())(bi)
 		WithCmd(b.Cmd())(bi)
 		WithCacheFolders(b.CacheFolders())(bi)
+		WithCacheFiles(b.CacheFiles())(bi)
 
 		return nil
 	}

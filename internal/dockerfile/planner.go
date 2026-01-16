@@ -35,7 +35,8 @@ type BuildPlan struct {
 
 	attachInstruction []string
 
-	cachePaths []string
+	cachePaths     []string
+	cacheFilePaths []string
 
 	order []bricksengine.BrickID // for audit
 }
@@ -75,6 +76,7 @@ func (plan *BuildPlan) processBrick(brick bricksengine.Brick) bricksengine.Cache
 	plan.fileTemplates = append(plan.fileTemplates, brick.FileTemplates()...)
 	plan.order = append(plan.order, brick.ID())
 	plan.cachePaths = append(plan.cachePaths, brick.CacheFolders()...)
+	plan.cacheFilePaths = append(plan.cacheFilePaths, brick.CacheFiles()...)
 
 	return bricksengine.CacheFoldersPaths{}
 }
@@ -147,15 +149,16 @@ func (p *planner) buildPlan(ctx context.Context) (*BuildPlan, error) {
 	}
 
 	plan := &BuildPlan{
-		system:        p.systemBrick,
-		packages:      []bricksengine.PackageSpec{},
-		envs:          map[string]string{},
-		rootRun:       []bricksengine.Command{},
-		userRun:       []bricksengine.Command{},
-		fileTemplates: []bricksengine.FileTemplate{},
-		entrypoint:    []string{},
-		cmd:           []string{},
-		cachePaths:    []string{},
+		system:         p.systemBrick,
+		packages:       []bricksengine.PackageSpec{},
+		envs:           map[string]string{},
+		rootRun:        []bricksengine.Command{},
+		userRun:        []bricksengine.Command{},
+		fileTemplates:  []bricksengine.FileTemplate{},
+		entrypoint:     []string{},
+		cmd:            []string{},
+		cachePaths:     []string{},
+		cacheFilePaths: []string{},
 		// TODO: let bricks configure it and make sure system args is not overriden by bricks
 		// TODO: replace this with sandboxconfig. remove args entirely.
 		args: map[string]string{
@@ -211,6 +214,7 @@ func (p *planner) buildPlan(ctx context.Context) (*BuildPlan, error) {
 	plan.userRun = uniqueCommands(plan.userRun)
 	plan.fileTemplates = uniqueFileTemplates(plan.fileTemplates)
 	plan.cachePaths = uniqueStrings(plan.cachePaths)
+	plan.cacheFilePaths = uniqueStrings(plan.cacheFilePaths)
 
 	plan.expandPackages()
 
