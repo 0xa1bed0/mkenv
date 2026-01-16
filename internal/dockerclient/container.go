@@ -147,7 +147,20 @@ func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Pr
 		return
 	}
 
+	// Resolve cache file store (single volume for all cached files)
+	cacheFileStore, err := dc.resolveCacheFileStore(ctx, imageTag, project)
+	if err != nil {
+		return
+	}
+
+	// Track mounted paths to avoid duplicates
+	mountedPaths := make(map[string]bool)
+
 	for _, vol := range volumes {
+		if mountedPaths[vol.MountPath] {
+			continue
+		}
+		mountedPaths[vol.MountPath] = true
 		hostCfg.Mounts = append(hostCfg.Mounts, mount.Mount{
 			Type:   mount.TypeVolume,
 			Source: vol.Name,
@@ -155,13 +168,7 @@ func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Pr
 		})
 	}
 
-	// Resolve cache file store (single volume for all cached files)
-	cacheFileStore, err := dc.resolveCacheFileStore(ctx, imageTag, project)
-	if err != nil {
-		return
-	}
-
-	if cacheFileStore != nil {
+	if cacheFileStore != nil && !mountedPaths[cacheFileStore.MountPath] {
 		hostCfg.Mounts = append(hostCfg.Mounts, mount.Mount{
 			Type:   mount.TypeVolume,
 			Source: cacheFileStore.Name,
