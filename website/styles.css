@@ -26,6 +26,14 @@ header .logo {
 header .logo a {
     color: #fff;
     text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+header .logo-icon {
+    width: 36px;
+    background: #fff;
+    border-radius: 4px;
 }
 header .logo a:hover {
     text-decoration: underline;
