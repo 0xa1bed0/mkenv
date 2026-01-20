@@ -32,8 +32,6 @@ header .logo a {
 }
 header .logo-icon {
     width: 36px;
-    background: #fff;
-    border-radius: 4px;
 }
 header .logo a:hover {
     text-decoration: underline;
