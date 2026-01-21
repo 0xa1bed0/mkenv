@@ -69,6 +69,20 @@ func (mr *MockPathOpsMockRecorder) Clean(path any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clean", reflect.TypeOf((*MockPathOps)(nil).Clean), path)
 }
 
+// Ext mocks base method.
+func (m *MockPathOps) Ext(name string) string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Ext", name)
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Ext indicates an expected call of Ext.
+func (mr *MockPathOpsMockRecorder) Ext(name any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ext", reflect.TypeOf((*MockPathOps)(nil).Ext), name)
+}
+
 // IsAbs mocks base method.
 func (m *MockPathOps) IsAbs(path string) bool {
 	m.ctrl.T.Helper()

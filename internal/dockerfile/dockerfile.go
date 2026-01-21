@@ -104,7 +104,9 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 	for _, cp := range plan.cachePaths {
 		path := replaceVars(cp, plan.args)
 		cacheFoldersPaths = append(cacheFoldersPaths, path)
-		lines = append(lines, `RUN ["mkdir", "-p", "`+path+`"]`)
+	}
+	if len(cacheFoldersPaths) > 0 {
+		lines = append(lines, `RUN ["mkdir", "-p", "`+strings.Join(cacheFoldersPaths, `", "`)+`"]`)
 	}
 
 	// Cache files are stored in a dedicated volume directory and symlinked
@@ -113,21 +115,32 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 	cacheFileStoreDir := ""
 	if len(plan.cacheFilePaths) > 0 {
 		cacheFileStoreDir = replaceVars("${MKENV_HOME}/.mkenv-file-cache", plan.args)
-		lines = append(lines, `RUN ["mkdir", "-p", "`+cacheFileStoreDir+`"]`)
+
+		// Build a single shell script for all cache file operations
+		var parentDirs []string
+		var touchCmds []string
+		var linkCmds []string
 
 		for _, cf := range plan.cacheFilePaths {
 			originalPath := replaceVars(cf, plan.args)
 			fileName := originalPath[strings.LastIndex(originalPath, "/")+1:]
 			cachedPath := cacheFileStoreDir + "/" + fileName
-
-			// Create the file in the cache directory and symlink from original location
-			lines = append(lines, `RUN ["touch", "`+cachedPath+`"]`)
-
-			// Ensure parent directory of symlink exists and create symlink
 			parentDir := originalPath[:strings.LastIndex(originalPath, "/")]
-			lines = append(lines, `RUN ["mkdir", "-p", "`+parentDir+`"]`)
-			lines = append(lines, `RUN ["ln", "-sf", "`+cachedPath+`", "`+originalPath+`"]`)
+
+			parentDirs = append(parentDirs, parentDir)
+			touchCmds = append(touchCmds, cachedPath)
+			linkCmds = append(linkCmds, "ln -sf "+cachedPath+" "+originalPath)
 		}
+
+		// Combine: mkdir all dirs, touch all files, create all symlinks
+		allDirs := append([]string{cacheFileStoreDir}, parentDirs...)
+		cmds := []string{
+			"mkdir -p " + strings.Join(allDirs, " "),
+			"touch " + strings.Join(touchCmds, " "),
+		}
+		cmds = append(cmds, linkCmds...)
+
+		lines = append(lines, `RUN /bin/sh -c '`+strings.Join(cmds, " && ")+`'`)
 	}
 
 	// Entrypoint/Cmd

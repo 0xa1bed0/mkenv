@@ -202,7 +202,7 @@ func (p *planner) buildPlan(ctx context.Context) (*BuildPlan, error) {
 				commands[i] = "\t" + run.String()
 			}
 			// TODO: make sure common brick really should not do this (think of shell bricks). and make user confirmation on this.
-			logs.Warnf("common brick " + string(brick.ID()) + " tries to execute root commands: \n\n" + strings.Join(commands, "\n"))
+			logs.Warnf("common brick %s tries to execute root commands: \n\n%s", brick.ID(), strings.Join(commands, "\n"))
 		}
 		plan.processBrick(brick)
 	}

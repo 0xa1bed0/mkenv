@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -16,13 +17,19 @@ import (
 	"github.com/docker/docker/api/types/container"
 )
 
+// setTerminalTitle sets the terminal tab/window title using ANSI escape sequences.
+func setTerminalTitle(title string) {
+	// OSC 0 sets both window title and icon name
+	fmt.Fprintf(os.Stdout, "\033]0;%s\007", title)
+}
+
 const (
 	dockerMaxNameLen = 255
 	shortLen         = 6       // length of the hash-like suffix
 	tailMarker       = "tail-" // visible indicator that we trimmed the left side
 )
 
-func (dc *DockerClient) AttachToRunning(ctx context.Context, containerID string, term *runtime.TerminalGuard) error {
+func (dc *DockerClient) AttachToRunning(ctx context.Context, containerID, displayName string, term *runtime.TerminalGuard) error {
 	cont, err := dc.client.ContainerInspect(ctx, containerID)
 	if err != nil {
 		return err
@@ -30,6 +37,11 @@ func (dc *DockerClient) AttachToRunning(ctx context.Context, containerID string,
 
 	if !cont.State.Running {
 		return errors.New("can't attach to non running container")
+	}
+
+	// Set terminal title
+	if displayName != "" {
+		setTerminalTitle(displayName)
 	}
 
 	attachCmd := strings.Split(cont.Config.Labels["mkenv.attachInstruction"], "|MKENVSEP|")
@@ -120,7 +132,10 @@ func (dc *DockerClient) AttachToRunning(ctx context.Context, containerID string,
 // - uses image's default CMD/ENTRYPOINT (tmux, zsh, etc.)
 // - attaches with a real TTY (so tmux + keybindings work)
 // - removes container on exit
-func (dc *DockerClient) RunContainer(ctx context.Context, projectName, containerID string, claimPort func() error, term *runtime.TerminalGuard) error {
+func (dc *DockerClient) RunContainer(ctx context.Context, projectName, projectPath, containerID string, claimPort func() error, term *runtime.TerminalGuard) error {
+	// Set terminal title to the folder name
+	folderName := filepath.Base(projectPath)
+	setTerminalTitle(folderName)
 	// Attach BEFORE start (like docker run)
 	attach, err := dc.client.ContainerAttach(ctx, containerID, container.AttachOptions{
 		Stream: true,

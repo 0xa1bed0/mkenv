@@ -83,7 +83,7 @@ func newAttachCmd() *cobra.Command {
 			}
 
 			if len(containers) == 1 {
-				return dockerClient.AttachToRunning(rt.Ctx(), containers[0].ContainerID, rt.Term())
+				return dockerClient.AttachToRunning(rt.Ctx(), containers[0].ContainerID, containers[0].Project, rt.Term())
 			}
 
 			selected, err := logs.PromptSelectOne("Select container to attach to", ui.ToSelectOptions(containers))
@@ -91,7 +91,16 @@ func newAttachCmd() *cobra.Command {
 				return err
 			}
 
-			return dockerClient.AttachToRunning(rt.Ctx(), selected.OptionID(), rt.Term())
+			// Find the selected container to get its project name
+			var displayName string
+			for _, c := range containers {
+				if c.ContainerID == selected.OptionID() {
+					displayName = c.Project
+					break
+				}
+			}
+
+			return dockerClient.AttachToRunning(rt.Ctx(), selected.OptionID(), displayName, rt.Term())
 		},
 	}
 

@@ -19,6 +19,9 @@ all: fmt agent host
 fmt:
 	go fmt ./...
 
+test:
+	go test ./...
+
 # -------------------------
 # Build Linux agent binaries for embedding
 # -------------------------

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -21,6 +22,25 @@ func GetHostBusyPorts(rt *runtime.Runtime) ([]int, error) {
 	switch rt.GOOS() {
 	case "darwin":
 		ports, err := scanBusyPortsLsof(rt.Ctx())
+		if err != nil {
+			return nil, err
+		}
+		// Dedup + sort for stable output
+		if len(ports) > 1 {
+			sort.Ints(ports)
+			out := ports[:0]
+			last := -1
+			for _, p := range ports {
+				if p != last {
+					out = append(out, p)
+					last = p
+				}
+			}
+			ports = out
+		}
+		return ports, nil
+	case "linux":
+		ports, err := scanBusyPortsProc(rt.Ctx())
 		if err != nil {
 			return nil, err
 		}
@@ -113,4 +133,92 @@ func scanBusyPortsLsof(ctx context.Context) ([]int, error) {
 	}
 	sort.Ints(out)
 	return out, nil
+}
+
+// Linux: parse /proc/net/tcp and /proc/net/tcp6 to get all listening TCP ports.
+func scanBusyPortsProc(ctx context.Context) ([]int, error) {
+	portsSet := make(map[int]struct{})
+
+	// Parse IPv4 TCP ports
+	if err := parseProcNetTCP("/proc/net/tcp", portsSet); err != nil {
+		logs.Warnf("hostports: failed to parse /proc/net/tcp: %v", err)
+	}
+
+	// Check context cancellation between file reads
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	// Parse IPv6 TCP ports
+	if err := parseProcNetTCP("/proc/net/tcp6", portsSet); err != nil {
+		// IPv6 might be disabled, log at debug level only
+		logs.Debugf("hostports: failed to parse /proc/net/tcp6: %v", err)
+	}
+
+	out := make([]int, 0, len(portsSet))
+	for p := range portsSet {
+		out = append(out, p)
+	}
+	sort.Ints(out)
+	return out, nil
+}
+
+// parseProcNetTCP parses a /proc/net/tcp or /proc/net/tcp6 file and extracts
+// listening ports into the provided set.
+// Format: sl local_address rem_address st tx_queue:rx_queue ...
+// State "0A" means LISTEN.
+func parseProcNetTCP(path string, portsSet map[int]struct{}) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+
+	// Skip header line
+	if !scanner.Scan() {
+		return scanner.Err()
+	}
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+
+		// fields[3] is the state in hex
+		state := fields[3]
+		if state != "0A" { // 0A = LISTEN
+			continue
+		}
+
+		// fields[1] is local_address in format "IPADDR:PORT" (hex)
+		port, err := parseProcPort(fields[1])
+		if err != nil {
+			continue
+		}
+
+		if port > 0 && port <= 65535 {
+			portsSet[port] = struct{}{}
+		}
+	}
+
+	return scanner.Err()
+}
+
+// parseProcPort extracts the port number from a /proc/net/tcp address field.
+// Format: "IPADDR:PORT" where both are in hex, e.g., "0100007F:0BB8" -> port 3000.
+func parseProcPort(s string) (int, error) {
+	idx := strings.LastIndex(s, ":")
+	if idx < 0 || idx+1 >= len(s) {
+		return 0, fmt.Errorf("invalid address format: %s", s)
+	}
+	portHex := s[idx+1:]
+	port, err := strconv.ParseInt(portHex, 16, 32)
+	if err != nil {
+		return 0, fmt.Errorf("invalid port hex: %s", portHex)
+	}
+	return int(port), nil
 }

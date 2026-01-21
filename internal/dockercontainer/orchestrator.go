@@ -111,7 +111,7 @@ func (co *ContainerOrchestrator) startEnv() {
 
 	errChan := make(chan error, 1)
 	co.rt.GoNamed("RunContainer", func() {
-		err := co.dockerClient.RunContainer(containerCtx, co.rt.Project().Name(), containerID, containerPortRessservation.Claim, co.rt.Term())
+		err := co.dockerClient.RunContainer(containerCtx, co.rt.Project().Name(), co.rt.Project().Path(), containerID, containerPortRessservation.Claim, co.rt.Term())
 		errChan <- err
 	})
 

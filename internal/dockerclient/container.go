@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -101,9 +102,13 @@ func (dc *DockerClient) ListContainers(ctx context.Context, project *runtime.Pro
 }
 
 func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Project, imageTag string, envs, binds []string) (containerID string, containerPortReservation *host.PortReservation, err error) {
+	// Use folder name as hostname for friendly display in shell prompts
+	hostname := sanitizeHostname(filepath.Base(project.Path()))
+
 	cfg := &container.Config{
-		Image: imageTag,
-		Env:   envs,
+		Image:    imageTag,
+		Hostname: hostname,
+		Env:      envs,
 
 		// use image's CMD/ENTRYPOINT (tmux/zsh/etc)
 
@@ -224,4 +229,43 @@ func procTag() string {
 func shortHash(s string, n int) string {
 	h := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(h[:])[:n]
+}
+
+// sanitizeHostname ensures the hostname is valid (RFC 1123):
+// - lowercase letters, digits, and hyphens only
+// - must start with a letter
+// - max 63 characters
+func sanitizeHostname(name string) string {
+	name = strings.ToLower(name)
+
+	var b strings.Builder
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		} else if r == '-' || r == '_' || r == '.' || r == ' ' {
+			b.WriteRune('-')
+		}
+	}
+
+	hostname := b.String()
+
+	// Remove leading/trailing hyphens
+	hostname = strings.Trim(hostname, "-")
+
+	// Must start with a letter
+	if len(hostname) > 0 && (hostname[0] >= '0' && hostname[0] <= '9') {
+		hostname = "dev-" + hostname
+	}
+
+	// Max 63 characters
+	if len(hostname) > 63 {
+		hostname = hostname[:63]
+	}
+
+	// Fallback if empty
+	if hostname == "" {
+		hostname = "mkenv"
+	}
+
+	return hostname
 }
