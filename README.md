@@ -20,12 +20,23 @@ Your `npm install`, `pip install`, LLM agents, and builds run isolated. Your cre
 
 **Prerequisites:** Docker Desktop or Docker Engine
 
+**macOS (Homebrew):**
 ```sh
 brew tap 0xa1bed0/mkenv
 brew install mkenv
 ```
 
-**Platform support:** macOS only. Linux in development. Windows planned via WSL.
+**Linux / Windows (WSL):**
+```sh
+# Download binary (arm64 or amd64)
+curl -L https://github.com/0xa1bed0/mkenv/releases/latest/download/mkenv-linux-arm64 -o mkenv
+# or: curl -L https://github.com/0xa1bed0/mkenv/releases/latest/download/mkenv-linux-amd64 -o mkenv
+
+chmod +x mkenv
+sudo mv mkenv /usr/local/bin/
+```
+
+**Platform support:** macOS, Linux, and Windows (via WSL).
 
 ## Features
 

@@ -32,16 +32,25 @@
 
     <section id="installation">
         <h2>Installation</h2>
-        <div class="note">Platform: macOS only right now. Linux is on the radar, Windows likely via WSL later. Bring Docker Desktop or equivalent.</div>
+        <div class="note">Platform: macOS, Linux, and Windows (via WSL). Bring Docker Desktop or equivalent.</div>
         <h3>Prerequisites</h3>
         <ul>
-            <li>macOS 12+.</li>
+            <li>macOS 12+ / Linux (arm64 or amd64) / Windows 10+ with WSL2.</li>
             <li>Docker Desktop 4.x or Docker Engine with virtualization enabled.</li>
             <li>Terminal basics (zsh/bash) and permissions to install binaries to <code>$PATH</code>.</li>
         </ul>
-        <h3>Install via Homebrew</h3>
+        <h3>macOS (Homebrew)</h3>
         <pre><code>brew tap 0xa1bed0/mkenv
 brew install mkenv</code></pre>
+
+        <h3>Linux / Windows (WSL)</h3>
+        <pre><code># Download the binary (arm64 or amd64)
+curl -L https://github.com/0xa1bed0/mkenv/releases/latest/download/mkenv-linux-arm64 -o mkenv
+# or for amd64: curl -L https://github.com/0xa1bed0/mkenv/releases/latest/download/mkenv-linux-amd64 -o mkenv
+
+# Make it executable and move to PATH
+chmod +x mkenv
+sudo mv mkenv /usr/local/bin/</code></pre>
 
         <h3>Verify Installation</h3>
         <pre><code>mkenv version</code></pre>
@@ -550,7 +559,7 @@ claude</code></pre>
     <section id="faq">
         <h2>FAQ</h2>
         <h3>Can I use this on Linux or Windows?</h3>
-        <p>Not officially yet. Linux support is near-term; Windows likely rides on WSL once the experience doesn't suck.</p>
+        <p>Yes. Linux is fully supported (arm64 and amd64). Windows works via WSL2 using the Linux binary.</p>
         <h3>Does mkenv replace Docker Desktop?</h3>
         <p>No, it depends on Docker for virtualization. Think of mkenv as the paranoid orchestrator on top.</p>
         <h3>Where is the cache stored?</h3>

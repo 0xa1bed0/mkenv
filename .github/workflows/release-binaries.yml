@@ -1,4 +1,4 @@
-name: Build and release darwin arm64 binary
+name: Build and release binaries
 
 on:
   push:
@@ -65,7 +65,21 @@ jobs:
           make VERSION=$VERSION TARGET_OS=darwin TARGET_ARCH=amd64
           cp dist/darwin-amd64/mkenv dist/mkenv-darwin-amd64
           sha256sum dist/mkenv-darwin-amd64 > dist/mkenv-darwin-amd64.sha256
-      
+
+      - name: Build linux arm64 binary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          make VERSION=$VERSION TARGET_OS=linux TARGET_ARCH=arm64
+          cp dist/linux-arm64/mkenv dist/mkenv-linux-arm64
+          sha256sum dist/mkenv-linux-arm64 > dist/mkenv-linux-arm64.sha256
+
+      - name: Build linux amd64 binary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          make VERSION=$VERSION TARGET_OS=linux TARGET_ARCH=amd64
+          cp dist/linux-amd64/mkenv dist/mkenv-linux-amd64
+          sha256sum dist/mkenv-linux-amd64 > dist/mkenv-linux-amd64.sha256
+
       # NEW: Create combined checksums file
       - name: Create checksums file
         run: |
@@ -73,6 +87,8 @@ jobs:
           if [ -f dist/mkenv-darwin-amd64.sha256 ]; then
             cat dist/mkenv-darwin-amd64.sha256 >> dist/checksums.txt
           fi
+          cat dist/mkenv-linux-arm64.sha256 >> dist/checksums.txt
+          cat dist/mkenv-linux-amd64.sha256 >> dist/checksums.txt
       
       - name: Release semver tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -87,6 +103,10 @@ jobs:
             dist/mkenv-darwin-arm64.sha256 \
             dist/mkenv-darwin-amd64 \
             dist/mkenv-darwin-amd64.sha256 \
+            dist/mkenv-linux-arm64 \
+            dist/mkenv-linux-arm64.sha256 \
+            dist/mkenv-linux-amd64 \
+            dist/mkenv-linux-amd64.sha256 \
             dist/checksums.txt --clobber
       
       - name: Update latest alias
@@ -103,10 +123,14 @@ jobs:
             dist/mkenv-darwin-arm64.sha256 \
             dist/mkenv-darwin-amd64 \
             dist/mkenv-darwin-amd64.sha256 \
+            dist/mkenv-linux-arm64 \
+            dist/mkenv-linux-arm64.sha256 \
+            dist/mkenv-linux-amd64 \
+            dist/mkenv-linux-amd64.sha256 \
             dist/checksums.txt --clobber
       
       - name: Update development alias
-        if: github.ref == 'refs/heads/main' 
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -114,7 +138,14 @@ jobs:
           git push -f origin development
           gh release view development >/dev/null 2>&1 || \
             gh release create development --title development --notes "Latest development build from main/master."
-          gh release upload development dist/mkenv-darwin-arm64 dist/mkenv-darwin-arm64.sha256 dist/checksums.txt --clobber
+          gh release upload development \
+            dist/mkenv-darwin-arm64 \
+            dist/mkenv-darwin-arm64.sha256 \
+            dist/mkenv-linux-arm64 \
+            dist/mkenv-linux-arm64.sha256 \
+            dist/mkenv-linux-amd64 \
+            dist/mkenv-linux-amd64.sha256 \
+            dist/checksums.txt --clobber
       
       # NEW: Homebrew formula generation and publishing
       - name: Generate Homebrew formula
