@@ -28,7 +28,7 @@ func (f *Forwarder) Start(rt *runtime.Runtime) error {
 	addr := fmt.Sprintf("0.0.0.0:%d", f.TargetPort)
 
 	server, err := transport.ServeTCP(rt, addr, func(servctx context.Context, conn net.Conn) {
-		logs.Debugf("[mkenv host] forwarder accepted client on %d from %s", f.TargetPort, conn.RemoteAddr())
+		logs.Debugf("forwarder accepted client on %d from %s", f.TargetPort, conn.RemoteAddr())
 		f.handleConn(conn)
 	})
 	if err != nil {
@@ -36,7 +36,7 @@ func (f *Forwarder) Start(rt *runtime.Runtime) error {
 	}
 
 	f.srv = server
-	logs.Debugf("[mkenv host] forwarder listening on %s -> container:%d (via proxy at %d)", addr, f.TargetPort, f.ContainerProxyPort)
+	logs.Debugf("forwarder listening on %s -> container:%d (via proxy at %d)", addr, f.TargetPort, f.ContainerProxyPort)
 	return nil
 }
 
@@ -60,7 +60,7 @@ func (f *Forwarder) handleConn(clientConn net.Conn) {
 	// TODO: make 0 (delayBetweenAttempts) configurable
 	backendConn, err := transport.DialTCP(ctx, fmt.Sprintf("127.0.0.1:%d", f.ContainerProxyPort), 5, 0)
 	if err != nil {
-		logs.Errorf("[mkenv host] forwarder: DialProxy failed for host port %d: %v", f.TargetPort, err)
+		logs.Errorf("forwarder: DialProxy failed for host port %d: %v", f.TargetPort, err)
 		return
 	}
 	defer backendConn.Close()
@@ -68,7 +68,7 @@ func (f *Forwarder) handleConn(clientConn net.Conn) {
 	// The proxy chain is always localhost:HostPort -> loclahost(container):ContainerPort (proxy) -> container:HostPort
 	// because when something exposes 3000 port in the container (npm run dev) - the same 3000 port must be opened on host
 	if err := protocol.WriteProxyHeader(backendConn, f.TargetPort); err != nil {
-		logs.Errorf("[mkenv host] forwarder: header write failed on %d: %v", f.TargetPort, err)
+		logs.Errorf("forwarder: header write failed on %d: %v", f.TargetPort, err)
 		return
 	}
 

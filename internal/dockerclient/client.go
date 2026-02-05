@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/docker/go-sdk/client"
 )
 
@@ -33,7 +34,12 @@ func DefaultDockerClient() (*DockerClient, error) {
 }
 
 func (dc *DockerClient) ImageExists(ctx context.Context, imageRef string) bool {
+	logs.Debugf("ImageExists: checking imageRef=%s", imageRef)
 	_, err := dc.client.ImageInspect(ctx, imageRef)
-
-	return err == nil
+	if err != nil {
+		logs.Debugf("ImageExists: imageRef=%s not found: %v", imageRef, err)
+		return false
+	}
+	logs.Debugf("ImageExists: imageRef=%s found", imageRef)
+	return true
 }

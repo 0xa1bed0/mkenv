@@ -88,9 +88,12 @@ func (dc *DockerClient) AttachToRunning(ctx context.Context, containerID, displa
 	_ = dc.client.ContainerExecResize(ctx, execResp.ID, container.ResizeOptions{Width: w, Height: h})
 
 	// IMPORTANT: start stdout pump immediately
+	// Wrap stdout with filter to preserve terminal content on exit
+	filteredOut := runtime.NewAltScreenFilter(os.Stdout)
 	outErr := make(chan error, 1)
 	go func() {
-		_, e := io.Copy(os.Stdout, hijack.Reader) // TTY=true => raw stream (no stdcopy)
+		_, e := io.Copy(filteredOut, hijack.Reader) // TTY=true => raw stream (no stdcopy)
+		filteredOut.Flush()
 		outErr <- e
 	}()
 
@@ -188,8 +191,11 @@ func (dc *DockerClient) RunContainer(ctx context.Context, projectName, projectPa
 	}()
 
 	// container → stdout (TTY=true: merged)
+	// Wrap stdout with filter to preserve terminal content on exit
+	filteredOut := runtime.NewAltScreenFilter(os.Stdout)
 	go func() {
-		_, _ = io.Copy(os.Stdout, attach.Reader)
+		_, _ = io.Copy(filteredOut, attach.Reader)
+		filteredOut.Flush()
 	}()
 
 	if err := dc.startSandboxDaemon(ctx, projectName, containerID); err != nil {

@@ -46,7 +46,7 @@ func daemonCmdRunE(cmd *cobra.Command, args []string) error {
 	// Best-effort single-instance guard.
 	if err := ensureSingleInstance(); err != nil {
 		if errors.Is(err, errAlreadyRunning) {
-			logs.Infof("[mkenv-agent] ports daemon already running, exiting")
+			logs.Infof("ports daemon already running, exiting")
 			return nil
 		}
 		return err
@@ -59,7 +59,7 @@ func daemonCmdRunE(cmd *cobra.Command, args []string) error {
 	portsOrchestrator.StartSnapshotReporter()
 
 	rt.Wait()
-	logs.Infof("[mkenv-agent] daemon exiting")
+	logs.Infof("daemon exiting")
 	return nil
 }
 

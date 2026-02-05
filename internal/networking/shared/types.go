@@ -38,3 +38,17 @@ type BlockedPorts struct {
 type Install struct {
 	PkgName string `json:"PkgName"`
 }
+
+type LogEntry struct {
+	Line string `json:"line"`
+}
+
+type FetchLogsRequest struct {
+	Offset int `json:"offset"` // Line offset to start from (0 = beginning)
+	Limit  int `json:"limit"`  // Max lines to return (0 = all remaining)
+}
+
+type FetchLogsResponse struct {
+	Lines      []string `json:"lines"`
+	TotalLines int      `json:"total_lines"` // Total lines in the log file
+}

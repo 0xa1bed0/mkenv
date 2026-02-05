@@ -39,18 +39,24 @@ func DefaultDockerImageResolver(ctx context.Context) (*DockerImageResolver, erro
 
 func (dib *DockerImageResolver) ResolveImageID(ctx context.Context, project *runtime.Project, forceRebuild bool) (ImageID, error) {
 	for {
-		logs.Debugf("try to resolve image")
+		logs.Debugf("try to resolve image for project: %s", project.Path())
 		idByRunConfig, found, runConfigCacheKey := dib.imageCache.GetByProject(ctx, project)
+		logs.Debugf("project cache lookup: key=%s, found=%v, imageID=%s", runConfigCacheKey, found, idByRunConfig)
 		// we need to set new imaghe to the cache, so we preserve cache key and override result
 		// TODO: maybe we don't need to read db in this case - just get cache key and that's it
 		if forceRebuild {
+			logs.Debugf("forceRebuild=true, ignoring cached image")
 			idByRunConfig = ""
 			found = false
 		}
 		if found {
-			if dib.dockerClient.ImageExists(ctx, string(idByRunConfig)) {
+			exists := dib.dockerClient.ImageExists(ctx, string(idByRunConfig))
+			logs.Debugf("checking if image exists in Docker: imageRef=%s, exists=%v", idByRunConfig, exists)
+			if exists {
+				logs.Debugf("cache hit: returning existing image %s", idByRunConfig)
 				return idByRunConfig, nil
 			}
+			logs.Debugf("image not found in Docker, deleting stale cache entry: key=%s", runConfigCacheKey)
 			dib.imageCache.delete(ctx, runConfigCacheKey)
 		}
 
@@ -69,17 +75,23 @@ func (dib *DockerImageResolver) ResolveImageID(ctx context.Context, project *run
 		logs.Debugf("generating dockerfile...")
 		df := plan.GenerateDockerfile()
 		idByDockerfile, found, dockerfileCacheKey := dib.imageCache.GetByDockerfile(ctx, df)
+		logs.Debugf("dockerfile cache lookup: key=%s, found=%v, imageID=%s", dockerfileCacheKey, found, idByDockerfile)
 		if forceRebuild {
+			logs.Debugf("forceRebuild=true, ignoring dockerfile cache")
 			idByRunConfig = ""
 			found = false
 		}
 
 		if found && !idByDockerfile.IsBuilding() {
-			if dib.dockerClient.ImageExists(ctx, string(idByDockerfile)) {
+			exists := dib.dockerClient.ImageExists(ctx, string(idByDockerfile))
+			logs.Debugf("checking if dockerfile-cached image exists: imageRef=%s, exists=%v", idByDockerfile, exists)
+			if exists {
+				logs.Debugf("dockerfile cache hit: linking project cache and returning image %s", idByDockerfile)
 				dib.imageCache.set(ctx, runConfigCacheKey, idByDockerfile)
 				return idByDockerfile, nil
 			}
 
+			logs.Debugf("dockerfile-cached image not in Docker, deleting stale entry: key=%s", dockerfileCacheKey)
 			dib.imageCache.delete(ctx, dockerfileCacheKey)
 		}
 
@@ -97,8 +109,10 @@ func (dib *DockerImageResolver) ResolveImageID(ctx context.Context, project *run
 		logs.Debugf("dockerfile cache miss. Starting building...")
 
 		buildingTag := dib.imageCache.ClaimBuilding(ctx, runConfigCacheKey, dockerfileCacheKey)
+		logs.Debugf("claimed building tag: %s", buildingTag)
 
 		imageTag := composeImageTagForProject(project, runConfigCacheKey, dockerfileCacheKey)
+		logs.Debugf("building image with tag: %s", imageTag)
 		dockerImageID, err := dib.dockerClient.BuildImage(ctx, df.String(), imageTag)
 		if err != nil {
 			dib.imageCache.StopBuilding(ctx, runConfigCacheKey, buildingTag)

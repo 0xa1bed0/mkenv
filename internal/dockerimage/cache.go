@@ -71,6 +71,7 @@ func cacheKeyFromProject(ctx context.Context, project *runtime.Project) state.KV
 		logs.Warnf("can't derive cache key from project: %v\nSkipping...", err)
 		return ""
 	}
+	logs.Debugf("cacheKeyFromProject: path=%s, signature=%s", project.Path(), signature)
 	return state.KVStoreKey(signature)
 }
 
@@ -105,31 +106,39 @@ func DefaultNaiveDockerImageCache(ctx context.Context) *DockerImageCache {
 
 func (dic *DockerImageCache) get(ctx context.Context, key state.KVStoreKey) (ImageID, bool, state.KVStoreKey) {
 	if dic.kvStore == nil {
+		logs.Debugf("cache.get: kvStore is nil, cache disabled")
 		return "", false, key
 	}
 
+	logs.Debugf("cache.get: looking up key=%s", key)
 	entry, found, err := dic.kvStore.Get(ctx, key)
 	if err != nil {
+		logs.Debugf("cache.get: error during lookup key=%s: %v", key, err)
 		return "", false, key
 	}
 	if entry.Value == "" {
+		logs.Debugf("cache.get: key=%s found=%v but value is empty", key, found)
 		return "", false, key
 	}
 
 	imageID := ImageID(entry.Value)
 	if imageID.isBuildingStale() {
+		logs.Debugf("cache.get: key=%s has stale building tag, deleting", key)
 		dic.delete(ctx, key)
 		return "", false, key
 	}
 
+	logs.Debugf("cache.get: key=%s returning imageID=%s", key, imageID)
 	return imageID, found, key
 }
 
 func (dic *DockerImageCache) delete(ctx context.Context, key state.KVStoreKey) {
 	if dic.kvStore == nil {
+		logs.Debugf("cache.delete: kvStore is nil, skipping")
 		return
 	}
 
+	logs.Debugf("cache.delete: deleting key=%s", key)
 	err := dic.kvStore.Delete(ctx, key)
 	if err != nil {
 		logs.Warnf("Can't delete image id from cache for this project. %v Skipping...", err)
@@ -138,9 +147,11 @@ func (dic *DockerImageCache) delete(ctx context.Context, key state.KVStoreKey) {
 
 func (dic *DockerImageCache) set(ctx context.Context, key state.KVStoreKey, value ImageID) {
 	if dic.kvStore == nil {
+		logs.Debugf("cache.set: kvStore is nil, skipping")
 		return
 	}
 
+	logs.Debugf("cache.set: key=%s, value=%s", key, value)
 	err := dic.kvStore.Upsert(ctx, key, string(value))
 	if err != nil {
 		logs.Warnf("Can't upsert docker image cache. %v Skipping...", err)

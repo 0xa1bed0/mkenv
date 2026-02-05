@@ -3,6 +3,7 @@ package langs
 import (
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/filesmanager"
+	"github.com/0xa1bed0/mkenv/internal/versions"
 )
 
 const (
@@ -72,7 +73,7 @@ esac
 		bricksengine.WithFileTemplate(bricksengine.FileTemplate{
 			ID:       "lang/nodejs",
 			FilePath: "rc",
-			Content: `# Nodejs version manager start 
+			Content: `# Nodejs version manager start
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && . "$NVM_DIR/bash_completion"
 # Nodejs version manager end`,
@@ -86,27 +87,68 @@ esac
 }
 
 type nodejsDetector struct {
-	langDetector bricksengine.LangDetector
+	packageJsonDetector bricksengine.LangDetector
+	npmrcDetector       bricksengine.LangDetector
 }
 
 func (*nodejsDetector) BrickInfo() *bricksengine.BrickInfo {
 	return bricksengine.NewBrickInfo(nodejsID, nodejsDescription, nodejsKinds)
 }
 
-func (gd *nodejsDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine.BrickID, map[string]string, error) {
-	found, brickMeta, err := gd.langDetector.ScanFiles(folderPtr)
+func (nd *nodejsDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine.BrickID, map[string]string, error) {
+	// Check package.json for version
+	pkgFound, pkgMeta, err := nd.packageJsonDetector.ScanFiles(folderPtr)
 	if err != nil {
 		return "", nil, err
 	}
-	if found {
-		return nodejsID, brickMeta, nil
+
+	// Check .npmrc for version
+	npmrcFound, npmrcMeta, err := nd.npmrcDetector.ScanFiles(folderPtr)
+	if err != nil {
+		return "", nil, err
 	}
-	return "", nil, nil
+
+	// Not a nodejs project
+	if !pkgFound && !npmrcFound {
+		return "", nil, nil
+	}
+
+	// Combine versions from both sources
+	pkgVersion := ""
+	if pkgMeta != nil {
+		pkgVersion = pkgMeta["version"]
+	}
+	npmrcVersion := ""
+	if npmrcMeta != nil {
+		npmrcVersion = npmrcMeta["version"]
+	}
+
+	// Determine final version
+	var finalMeta map[string]string
+	if pkgVersion != "" && npmrcVersion != "" {
+		// Both have versions - compare and use maximum
+		maxVersion, err := versions.MaxVersion([]string{pkgVersion, npmrcVersion})
+		if err == nil {
+			finalMeta = map[string]string{"version": maxVersion}
+		} else {
+			// On error, prefer package.json version
+			finalMeta = map[string]string{"version": pkgVersion}
+		}
+	} else if pkgVersion != "" {
+		finalMeta = map[string]string{"version": pkgVersion}
+	} else if npmrcVersion != "" {
+		finalMeta = map[string]string{"version": npmrcVersion}
+	}
+
+	return nodejsID, finalMeta, nil
 }
 
 func init() {
 	bricksengine.RegisterBrick(nodejsID, NewNodejs)
 	bricksengine.RegisterDetector(func() bricksengine.BrickDetector {
-		return &nodejsDetector{langDetector: bricksengine.NewLangDetector(string(nodejsID), "package.json", "html,htm,htmlx,htmx,js,ts,jsx", `"node": "`)}
+		return &nodejsDetector{
+			packageJsonDetector: bricksengine.NewLangDetector(string(nodejsID), "package.json", "html,htm,htmlx,htmx,js,ts,jsx", `"node": "`),
+			npmrcDetector:       bricksengine.NewLangDetector(string(nodejsID), ".npmrc", "html,htm,htmlx,htmx,js,ts,jsx", "node-version="),
+		}
 	})
 }

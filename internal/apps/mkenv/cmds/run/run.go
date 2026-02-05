@@ -70,6 +70,7 @@ func (ro *runOptions) EnvConfig() runtime.EnvConfig {
 		runtime.WithEnableBricks(enableBricks),
 		runtime.WithDefaultEntrypointBrickID(bricksengine.BrickID(ro.Entrypoint)),
 		runtime.WithDefaultSystemBrickID(bricksengine.BrickID(ro.System)),
+		runtime.WithVolumes(ro.Volumes),
 	)
 
 	return cliRunConfig
@@ -141,7 +142,7 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 
 	rt.Container().SetImageTag(string(imageID))
 
-	binds, err := mkbinds(signalsCtx, project)
+	binds, err := mkbinds(signalsCtx, rt, project)
 	if err != nil {
 		return err
 	}
@@ -162,7 +163,7 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 	return containerOrchestrator.Start()
 }
 
-func mkbinds(ctx context.Context, project *runtime.Project) ([]string, error) {
+func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project) ([]string, error) {
 	binds, err := ResolveBinds(project.EnvConfig(ctx).Volumes())
 	if err != nil {
 		return nil, err
@@ -179,6 +180,10 @@ func mkbinds(ctx context.Context, project *runtime.Project) ([]string, error) {
 	}
 	//binds = append(binds, agentHostPath+":"+agentHostPath+":ro")
 	binds = append(binds, agentHostPath+"/mkenv:"+sandboxappconfig.UserLocalBin+"/mkenv:ro")
+
+	// Mount the host run log file for mkenv sandbox logs command
+	hostLogPath := hostappconfig.RunLogPath(project.Name(), rt.RunID())
+	binds = append(binds, hostLogPath+":"+sandboxappconfig.HostRunLogFile+":ro")
 
 	return binds, nil
 }

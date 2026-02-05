@@ -4,6 +4,7 @@ import (
 	"github.com/0xa1bed0/mkenv/internal/apps/sandbox/cmds/daemon"
 	"github.com/0xa1bed0/mkenv/internal/apps/sandbox/cmds/expose"
 	"github.com/0xa1bed0/mkenv/internal/apps/sandbox/cmds/install"
+	logscmd "github.com/0xa1bed0/mkenv/internal/apps/sandbox/cmds/logs"
 	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/runtime"
 	"github.com/spf13/cobra"
@@ -39,6 +40,7 @@ This cli provides auditable, secure sandbox escape route for developer convinien
 	sandbox.AddCommand(daemon.NewDaemonCmd())
 	sandbox.AddCommand(expose.NewExposeCmd())
 	sandbox.AddCommand(install.NewInstallCmd())
+	sandbox.AddCommand(logscmd.NewLogsCmd())
 
 	rootCmd.AddCommand(sandbox)
 

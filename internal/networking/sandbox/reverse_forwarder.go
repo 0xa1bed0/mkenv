@@ -44,7 +44,7 @@ func (rf *ReverseForwarder) Start() error {
 	}
 	rf.listener = ln
 
-	logs.Infof("[mkenv-agent] reverse forwarder listening on 127.0.0.1:%d -> %s", rf.port, rf.reverseProxy)
+	logs.Infof("reverse forwarder listening on 127.0.0.1:%d -> %s", rf.port, rf.reverseProxy)
 
 	go rf.acceptLoop()
 	return nil
@@ -60,7 +60,7 @@ func (rf *ReverseForwarder) acceptLoop() {
 				// Clean shutdown
 				return
 			default:
-				logs.Errorf("[mkenv-agent] reverse forwarder accept on port %d: %v", rf.port, err)
+				logs.Errorf("reverse forwarder accept on port %d: %v", rf.port, err)
 				return
 			}
 		}
@@ -75,18 +75,18 @@ func (rf *ReverseForwarder) handleConn(clientConn net.Conn) {
 	// Dial the host's reverse proxy server
 	hostConn, err := net.DialTimeout("tcp", rf.reverseProxy, 5*time.Second)
 	if err != nil {
-		logs.Errorf("[mkenv-agent] reverse forwarder: can't dial %s: %v", rf.reverseProxy, err)
+		logs.Errorf("reverse forwarder: can't dial %s: %v", rf.reverseProxy, err)
 		return
 	}
 	defer hostConn.Close()
 
 	// Send the port header to tell the host which port we want to access
 	if err := protocol.WriteProxyHeader(hostConn, rf.port); err != nil {
-		logs.Errorf("[mkenv-agent] reverse forwarder: can't write header for port %d: %v", rf.port, err)
+		logs.Errorf("reverse forwarder: can't write header for port %d: %v", rf.port, err)
 		return
 	}
 
-	logs.Debugf("[mkenv-agent] reverse forwarder: proxying container:%d -> host:%d", rf.port, rf.port)
+	logs.Debugf("reverse forwarder: proxying container:%d -> host:%d", rf.port, rf.port)
 
 	// Pump data bidirectionally
 	protocol.PumpBidirectional(clientConn, hostConn)

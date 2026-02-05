@@ -135,6 +135,15 @@ func WithDisabledAuto() envConfigOption {
 	}
 }
 
+func WithVolumes(volumes []string) envConfigOption {
+	return func(rc *envConfig) {
+		if volumes == nil {
+			return
+		}
+		rc.Volumes_ = append([]string{}, volumes...)
+	}
+}
+
 func BuildEnvConfig(opts ...envConfigOption) EnvConfig {
 	cfg := buildDefaultEnvConfig()
 	cfg.name = "built-inmemmory"
