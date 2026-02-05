@@ -1,24 +1,39 @@
 package logs
 
 import (
+	"io"
 	"os"
 	"sync"
 
 	"github.com/0xa1bed0/mkenv/internal/ui"
+	"github.com/0xa1bed0/mkenv/internal/version"
 )
 
 var (
-	initOnce sync.Once
-	logger   *ui.Logger
+	initOnce  sync.Once
+	logger    *ui.Logger
+	component string
 )
+
+// SetComponent sets the component name for all log messages.
+// Must be called before first log (before Init() or L()).
+func SetComponent(name string) {
+	component = name
+}
 
 func Init() {
 	initOnce.Do(func() {
+		logLevel := ui.LogLevelWarn
+		if version.Get() == "dev" {
+			logLevel = ui.LogLevelDebugVerbose
+		}
+
 		opts := ui.Options{
 			Out:        os.Stdout,
 			TailLines:  15,
 			EnableTail: true,
-			LogLevel:   ui.LogLevelWarn,
+			LogLevel:   logLevel,
+			Component:  component,
 		}
 		logger = ui.New(opts)
 		logger.Debug("logs initialized with opts %v", opts)
@@ -41,8 +56,8 @@ func SetDebugVerbosity(cnt int) {
 	}
 }
 
-func SetFullLogPath(path string) {
-	L().SetFullLogPath(path)
+func SetFullLogWriter(w io.Writer) {
+	L().SetFullLogWriter(w)
 }
 
 func Mute() (restore func()) {

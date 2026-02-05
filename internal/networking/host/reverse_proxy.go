@@ -50,7 +50,7 @@ func StartReverseProxyServer(rt *runtime.Runtime, policy guardrails.Policy) (*Re
 	}
 
 	addr := server.Listener.Addr().String()
-	logs.Debugf("[mkenv host] reverse proxy server will listen on %s", addr)
+	logs.Debugf("reverse proxy server will listen on %s", addr)
 
 	rps.addr = addr
 	rps.srv = server
@@ -60,7 +60,7 @@ func StartReverseProxyServer(rt *runtime.Runtime, policy guardrails.Policy) (*Re
 		rps.Stop()
 	})
 
-	logs.Debugf("[mkenv host] reverse proxy server listening on %s", addr)
+	logs.Debugf("reverse proxy server listening on %s", addr)
 	return rps, nil
 }
 
@@ -93,13 +93,13 @@ func (rps *ReverseProxyServer) handleConn(clientConn net.Conn) {
 	// Read the proxy header: "PORT 5432\n"
 	port, err := protocol.ReadProxyHeader(r)
 	if err != nil {
-		logs.Errorf("[mkenv host] reverse proxy: bad header from %s: %v", remote, err)
+		logs.Errorf("reverse proxy: bad header from %s: %v", remote, err)
 		return
 	}
 
 	// CRITICAL: Check policy - this enforces hardcoded denials + custom policy
 	if !rps.policy.AllowReverseProxy(port) {
-		logs.Warnf("[mkenv host] reverse proxy: port %d denied by policy (from %s)", port, remote)
+		logs.Warnf("reverse proxy: port %d denied by policy (from %s)", port, remote)
 		return
 	}
 
@@ -107,12 +107,12 @@ func (rps *ReverseProxyServer) handleConn(clientConn net.Conn) {
 	targetAddr := fmt.Sprintf("localhost:%d", port)
 	backendConn, err := net.Dial("tcp", targetAddr)
 	if err != nil {
-		logs.Errorf("[mkenv host] reverse proxy: can't dial %s for %s: %v", targetAddr, remote, err)
+		logs.Errorf("reverse proxy: can't dial %s for %s: %v", targetAddr, remote, err)
 		return
 	}
 	defer backendConn.Close()
 
-	logs.InfofSilent("[mkenv host] reverse proxy: container -> host:%d (start)", port)
+	logs.InfofSilent("reverse proxy: container -> host:%d (start)", port)
 
 	// Use bufferedConn to handle already-read header bytes
 	client := &bufferedConn{
@@ -122,5 +122,5 @@ func (rps *ReverseProxyServer) handleConn(clientConn net.Conn) {
 
 	protocol.PumpBidirectional(client, backendConn)
 
-	logs.InfofSilent("[mkenv host] reverse proxy: container -> host:%d (done)", port)
+	logs.InfofSilent("reverse proxy: container -> host:%d (done)", port)
 }

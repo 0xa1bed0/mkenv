@@ -146,3 +146,45 @@ func (c *ControlClient) Install(ctx context.Context, pkgName string) (*shared.On
 
 	return &response, nil
 }
+
+func (c *ControlClient) SendLog(line string) error {
+	req, _ := protocol.PackControlSignalEnvelope(protocol.NewID(), "mkenv.sandbox.log", &shared.LogEntry{Line: line})
+	return c.conn.Send(req)
+}
+
+func (c *ControlClient) FetchLogs(ctx context.Context, offset, limit int) (*shared.FetchLogsResponse, error) {
+	reqID := protocol.NewID()
+
+	fetchReq := &shared.FetchLogsRequest{Offset: offset, Limit: limit}
+	req, err := protocol.PackControlSignalEnvelope(reqID, "mkenv.sandbox.fetch-logs", fetchReq)
+	if err != nil {
+		return nil, err
+	}
+
+	responseEnvelope, err := c.conn.Call(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var response shared.FetchLogsResponse
+	err = protocol.UnpackControlSignalEnvelope(responseEnvelope, &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+// LogWriter wraps ControlClient as an io.Writer for use with logger
+type LogWriter struct {
+	client *ControlClient
+}
+
+func NewLogWriter(c *ControlClient) *LogWriter {
+	return &LogWriter{client: c}
+}
+
+func (w *LogWriter) Write(p []byte) (int, error) {
+	_ = w.client.SendLog(string(p)) // fire-and-forget, ignore errors
+	return len(p), nil
+}

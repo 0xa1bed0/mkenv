@@ -27,7 +27,7 @@ func NewProxyServer(rt *runtime.Runtime) *ProxyServer {
 }
 
 func (p *ProxyServer) Run(ctx context.Context) error {
-	logs.Infof("[mkenv-agent] proxy listening on %s", p.addr)
+	logs.Infof("proxy listening on %s", p.addr)
 
 	server, err := transport.ServeTCP(p.rt, p.addr, func(servctx context.Context, conn net.Conn) {
 		p.handleConn(servctx, conn)
@@ -62,20 +62,20 @@ func (p *ProxyServer) handleConn(ctx context.Context, clientConn net.Conn) {
 
 	port, err := protocol.ReadProxyHeader(r)
 	if err != nil {
-		logs.Errorf("[mkenv-agent] proxy: bad header from %s: %v", remote, err)
+		logs.Errorf("proxy: bad header from %s: %v", remote, err)
 		return
 	}
 
 	targetAddr := fmt.Sprintf("localhost:%d", port)
 	backendConn, err := net.Dial("tcp", targetAddr)
 	if err != nil {
-		logs.Errorf("[mkenv-agent] proxy: dial backend %s for %s: %v", targetAddr, remote, err)
+		logs.Errorf("proxy: dial backend %s for %s: %v", targetAddr, remote, err)
 		clientConn.Close()
 		return
 	}
 	defer backendConn.Close()
 
-	logs.Infof("[mkenv-agent] proxy: %s -> %s (start)", remote, targetAddr)
+	logs.Infof("proxy: %s -> %s (start)", remote, targetAddr)
 
 	client := &bufferedConn{
 		Conn: clientConn,
@@ -84,5 +84,5 @@ func (p *ProxyServer) handleConn(ctx context.Context, clientConn net.Conn) {
 
 	protocol.PumpBidirectional(client, backendConn)
 
-	logs.Infof("[mkenv-agent] proxy: %s -> %s (done)", remote, targetAddr)
+	logs.Infof("proxy: %s -> %s (done)", remote, targetAddr)
 }

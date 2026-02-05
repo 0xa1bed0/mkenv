@@ -1,7 +1,3 @@
-# -------------------------
-# Dead simple mkenv Makefile
-# -------------------------
-
 # Host target (override if needed: make host TARGET_OS=linux TARGET_ARCH=amd64)
 TARGET_OS   ?= darwin
 TARGET_ARCH ?= arm64

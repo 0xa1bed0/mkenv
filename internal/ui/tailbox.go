@@ -50,6 +50,10 @@ func (l *Logger) NewTail(name string) Tail {
 
 	if l.full != nil {
 		fmt.Fprintf(l.full, "[Tail %s] start\n", name)
+		// Force sync for tail boundaries to ensure immediate visibility
+		if s, ok := l.full.(syncer); ok {
+			s.Sync()
+		}
 	}
 
 	return &tailHandle{ui: l}
@@ -293,6 +297,10 @@ func (l *Logger) finalizeTailLocked() {
 
 	if l.full != nil {
 		fmt.Fprintf(l.full, "[Tail %s] end\n", l.tail.name)
+		// Force sync for tail boundaries to ensure immediate visibility
+		if s, ok := l.full.(syncer); ok {
+			s.Sync()
+		}
 	}
 
 	l.tail.closed = true

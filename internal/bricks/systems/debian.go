@@ -34,6 +34,9 @@ func NewDebian(metadata map[string]string) (bricksengine.Brick, error) {
 		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"useradd", "--uid", "${MKENV_UID}", "--gid", "${MKENV_GID}", "-m", "${MKENV_USERNAME}"}}),
 		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"mkdir", "-p", "${MKENV_LOCAL_BIN}"}}),
 		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"chown", "-R", "${MKENV_USERNAME}:${MKENV_USERNAME}", "${MKENV_LOCAL_BIN}"}}),
+		// Create mkenv state directory for host log file bind mount
+		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"mkdir", "-p", "${MKENV_HOME}/.local/state/mkenv"}}),
+		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"chown", "-R", "${MKENV_USERNAME}:${MKENV_USERNAME}", "${MKENV_HOME}/.local/state/mkenv"}}),
 		bricksengine.WithFileTemplate(bricksengine.FileTemplate{
 			ID:       "system config",
 			FilePath: "rc",

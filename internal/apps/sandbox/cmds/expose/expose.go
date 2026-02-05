@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/networking/sandbox"
 	"github.com/spf13/cobra"
 )
@@ -45,7 +46,7 @@ func runSandboxExpose(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("expose error: %w", err)
 	}
 
-	fmt.Printf("[mkenv] port %d exposed successfully\nYou can run your server now.", port)
+	logs.Infof("port %d exposed successfully, you can run your server now", port)
 	<-cmd.Context().Done()
 
 	return nil

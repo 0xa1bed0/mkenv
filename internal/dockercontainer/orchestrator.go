@@ -1,12 +1,15 @@
 package dockercontainer
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
+	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
 	"github.com/0xa1bed0/mkenv/internal/bricks/systems"
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/dockerclient"
@@ -91,6 +94,8 @@ func (co *ContainerOrchestrator) startEnv() {
 		co.controlAPI.ServerProtocol.Handle(co.onExpose())
 		co.controlAPI.ServerProtocol.Handle(co.onGetBlockedPorts())
 		co.controlAPI.ServerProtocol.Handle(co.onInstallRequest())
+		co.controlAPI.ServerProtocol.Handle(co.onLog())
+		co.controlAPI.ServerProtocol.Handle(co.onFetchLogs())
 	})
 
 	containerCtx, cancelContainer := context.WithCancel(co.rt.Ctx())
@@ -262,5 +267,62 @@ func (co *ContainerOrchestrator) onInstallRequest() (string, protocol.ControlCom
 		}
 
 		return &shared.OnInstallResponse{Logs: response.String()}, nil
+	}
+}
+
+func (co *ContainerOrchestrator) onLog() (string, protocol.ControlCommandHandler) {
+	return "mkenv.sandbox.log", func(ctx context.Context, req protocol.ControlSignalEnvelope) (any, error) {
+		var entry shared.LogEntry
+		protocol.UnpackControlSignalEnvelope(req, &entry)
+		// Write directly to log file (TimestampWriter adds timestamp)
+		if w := co.rt.LogWriter(); w != nil {
+			line := entry.Line
+			if !strings.HasSuffix(line, "\n") {
+				line += "\n"
+			}
+			w.Write([]byte(line))
+		}
+		return nil, nil
+	}
+}
+
+func (co *ContainerOrchestrator) onFetchLogs() (string, protocol.ControlCommandHandler) {
+	return "mkenv.sandbox.fetch-logs", func(ctx context.Context, req protocol.ControlSignalEnvelope) (any, error) {
+		var fetchReq shared.FetchLogsRequest
+		protocol.UnpackControlSignalEnvelope(req, &fetchReq)
+
+		logPath := hostappconfig.RunLogPath(co.rt.Project().Name(), co.rt.RunID())
+		f, err := os.Open(logPath)
+		if err != nil {
+			return &shared.FetchLogsResponse{Lines: []string{}, TotalLines: 0}, nil
+		}
+		defer f.Close()
+
+		var allLines []string
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			allLines = append(allLines, scanner.Text())
+		}
+
+		totalLines := len(allLines)
+
+		// Apply offset and limit
+		start := fetchReq.Offset
+		if start < 0 {
+			start = 0
+		}
+		if start > totalLines {
+			start = totalLines
+		}
+
+		end := totalLines
+		if fetchReq.Limit > 0 && start+fetchReq.Limit < totalLines {
+			end = start + fetchReq.Limit
+		}
+
+		return &shared.FetchLogsResponse{
+			Lines:      allLines[start:end],
+			TotalLines: totalLines,
+		}, nil
 	}
 }

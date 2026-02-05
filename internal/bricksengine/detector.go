@@ -54,6 +54,7 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 	if err != nil {
 		return false, brickMeta, err
 	}
+	logs.Debugf("detector[%s]: found %d %s files: %v", ld.brickName, len(result), targetFile, result)
 	if len(result) == 0 {
 		return found, nil, nil
 	}
@@ -65,6 +66,7 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 	versionsFound := []string{}
 
 	for _, gomod := range result {
+		logs.Debugf("detector[%s]: scanning file %s for prefix %q", ld.brickName, gomod, versionPrefix)
 		scanner, getFileScannerError := folderPtr.GetFileScanner(gomod, 32)
 		if getFileScannerError != nil {
 			return false, nil, getFileScannerError
@@ -73,7 +75,8 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 		if findError := scanner.Find([]byte(versionPrefix)); findError != nil {
 			// TODO: make custom error
 			if findError.Error() == "prefix not found" {
-				break
+				logs.Debugf("detector[%s]: prefix %q not found in %s, checking next file", ld.brickName, versionPrefix, gomod)
+				continue // Check other files
 			}
 			return false, nil, findError
 		}
@@ -83,12 +86,14 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 			return false, nil, defineVersionError
 		}
 
+		logs.Debugf("detector[%s]: found version %q in %s", ld.brickName, string(version), gomod)
 		versionsFound = append(versionsFound, string(version))
 	}
 
 	brickMeta = make(map[string]string)
 
 	if len(versionsFound) > 0 {
+		logs.Debugf("detector[%s]: all versions found: %v", ld.brickName, versionsFound)
 		versionToInstall, err := versions.MaxVersionFromConstraints(versionsFound)
 		if err != nil {
 			if !errors.Is(err, versions.ErrConflictingConstraints) {
@@ -96,9 +101,10 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 			}
 			logs.Warnf("Found evidence of conflicting versions for %s. Using the biggest one: %s", ld.brickName, versionToInstall)
 		}
+		logs.Debugf("detector[%s]: selected version %s", ld.brickName, versionToInstall)
 		brickMeta["version"] = versionToInstall
 	} else {
-		logs.Warnf("Can't estimate version for %s. Using kanown latest", ld.brickName)
+		logs.Warnf("Can't estimate version for %s. Using known latest", ld.brickName)
 	}
 
 	return true, brickMeta, nil

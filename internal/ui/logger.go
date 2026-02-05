@@ -8,9 +8,16 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
+
+// syncer is an interface for types that can sync to disk.
+// Both *os.File and *SyncWriter implement this.
+type syncer interface {
+	Sync() error
+}
 
 //
 // Public types & options
@@ -48,16 +55,25 @@ type Options struct {
 	// error < info < warn < debug < debugVerbose
 	// warn level always prints to the full log file unless greater value provided
 	LogLevel LogLevel
+
+	// Component identifies the source of log messages (e.g., "host", "agent").
+	// If empty, no component tag is included in log output.
+	Component string
 }
 
 // Logger is the main stdout logger + tail manager.
 type Logger struct {
-	out   io.Writer
-	full  io.Writer
-	mu    sync.Mutex
-	style styles
+	out       io.Writer
+	full      io.Writer
+	mu        sync.Mutex
+	style     styles
+	component string
 
 	logLevel LogLevel
+
+	// fullLogBuffer holds log lines written before full log writer is set.
+	// Once the full writer is set, this buffer is flushed and cleared.
+	fullLogBuffer []string
 
 	tail       *tailState
 	tailLines  int
@@ -114,28 +130,38 @@ func New(opts Options) *Logger {
 		tailLines:  opts.TailLines,
 		enableTail: opts.EnableTail,
 		logLevel:   opts.LogLevel,
+		component:  opts.Component,
 	}
 }
 
-func (l *Logger) SetFullLogPath(path string) {
+func (l *Logger) SetFullLogWriter(w io.Writer) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// Reject if already set
 	if l.full != nil {
-		l.Warn("attempt to change project audit log file. Skipping...")
+		timestamp := time.Now().Format("2006-01-02T15:04:05.000")
+		errMsg := fmt.Sprintf("[%s] [ERR ] attempted to set full log writer when already set, ignoring\n", timestamp)
+		fmt.Fprint(l.out, l.style.logError.Render(errMsg))
 		return
 	}
 
-	var err error
+	l.full = w
 
-	// Create parent directory if it doesn't exist
-	err = os.MkdirAll(filepath.Dir(path), 0o755)
-	if err != nil {
-		l.Error("can't create log directory: %v", err)
-		return
+	// Flush buffered log lines
+	for _, line := range l.fullLogBuffer {
+		io.WriteString(l.full, line)
 	}
+	l.fullLogBuffer = nil
+}
 
-	l.full, err = os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		l.Error("can't open full log path: %v", err)
-		return
+// writeFullLogLocked writes to the full log writer if set, otherwise buffers.
+// Must be called with l.mu held.
+func (l *Logger) writeFullLogLocked(line string) {
+	if l.full != nil {
+		io.WriteString(l.full, line)
+	} else {
+		l.fullLogBuffer = append(l.fullLogBuffer, line)
 	}
 }
 
@@ -213,10 +239,26 @@ func (l *Logger) formatCaller(format string, args ...any) string {
 // printLog handles clearing/redrawing tail box around a log line.
 func (l *Logger) printLog(silent bool, level string, style lipgloss.Style, format string, args ...any) {
 	msg := l.formatCaller(format, args...)
-	plain := fmt.Sprintf("%s\n", msg)
-	if level != "" {
-		plain = fmt.Sprintf("[%s] %s\n", level, msg)
+	timestamp := time.Now().Format("2006-01-02T15:04:05.000")
+
+	// Build component tag if set
+	componentTag := ""
+	if l.component != "" {
+		componentTag = fmt.Sprintf("[%s] ", l.component)
 	}
+
+	// Format for full log: no timestamp (TimestampWriter adds it at the destination)
+	logLine := componentTag + msg + "\n"
+	if level != "" {
+		logLine = fmt.Sprintf("[%s] %s%s\n", level, componentTag, msg)
+	}
+
+	// Format for stdout: includes timestamp
+	stdoutLine := fmt.Sprintf("[%s] %s%s", timestamp, componentTag, msg)
+	if level != "" {
+		stdoutLine = fmt.Sprintf("[%s] [%s] %s%s", timestamp, level, componentTag, msg)
+	}
+
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -225,15 +267,12 @@ func (l *Logger) printLog(silent bool, level string, style lipgloss.Style, forma
 		l.clearTailBoxLocked()
 	}
 
-	// Write to full log.
-	if l.full != nil {
-		io.WriteString(l.full, plain)
-	}
+	// Write to full log (without timestamp - TimestampWriter adds it).
+	l.writeFullLogLocked(logLine)
 
 	if !silent {
-		// Write styled to stdout.
-		line := strings.TrimRight(plain, "\n")
-		styled := style.Render(line)
+		// Write styled to stdout (with timestamp).
+		styled := style.Render(stdoutLine)
 		fmt.Fprintln(l.out, styled)
 
 		// Redraw live tail box if still active.
@@ -252,8 +291,11 @@ func (l *Logger) Banner(title string) {
 		l.clearTailBoxLocked()
 	}
 
-	if l.full != nil {
-		fmt.Fprintf(l.full, "\n===== %s =====\n\n", title)
+	bannerLine := fmt.Sprintf("\n===== %s =====\n\n", title)
+	l.writeFullLogLocked(bannerLine)
+	// Force sync for important banners to ensure immediate visibility
+	if s, ok := l.full.(syncer); ok {
+		s.Sync()
 	}
 
 	box := l.style.banner.Render(title)

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -14,6 +16,7 @@ import (
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
 	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/state"
+	"github.com/0xa1bed0/mkenv/internal/ui"
 )
 
 type RuntimeType string
@@ -42,10 +45,18 @@ type Runtime struct {
 	term *TerminalGuard
 
 	firstFailErr error
+
+	// logWriter is the destination for log entries (host only).
+	// Used by orchestrator to write forwarded agent logs directly.
+	logWriter io.Writer
 }
 
 func (rt *Runtime) Type() RuntimeType {
 	return rt.t
+}
+
+func (rt *Runtime) LogWriter() io.Writer {
+	return rt.logWriter
 }
 
 func (rt *Runtime) CancelCtx() {
@@ -156,7 +167,19 @@ func (rt *Runtime) ResolveProject(ctx context.Context, path string, kvStore *sta
 	rt.project = project
 
 	if rt.t == RuntimeTypeHost {
-		logs.SetFullLogPath(hostappconfig.RunLogPath(project.Name(), rt.RunID()))
+		logPath := hostappconfig.RunLogPath(project.Name(), rt.RunID())
+		if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+			logs.Warnf("can't create log directory: %v", err)
+		} else if f, err := os.OpenFile(logPath, os.O_CREATE|os.O_RDWR, 0o644); err != nil {
+			logs.Warnf("can't open log file: %v", err)
+		} else {
+			// Wrap in SyncWriter for periodic sync to ensure visibility in bind-mounted containers
+			// Then wrap in TimestampWriter to add timestamps at the final destination
+			syncWriter := ui.NewSyncWriter(f, 200*time.Millisecond)
+			timestampWriter := ui.NewTimestampWriter(syncWriter)
+			rt.logWriter = timestampWriter
+			logs.SetFullLogWriter(timestampWriter)
+		}
 	}
 
 	return rt.project, nil
