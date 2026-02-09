@@ -26,6 +26,7 @@ func NewDebian(metadata map[string]string) (bricksengine.Brick, error) {
 				{Name: "htop"},
 				{Name: "openssh-client"},
 				{Name: "netcat-traditional"}, // TODO: remove it
+				{Name: "tzdata"},
 			},
 		}),
 		// TODO: move this to platform
@@ -34,9 +35,9 @@ func NewDebian(metadata map[string]string) (bricksengine.Brick, error) {
 		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"useradd", "--uid", "${MKENV_UID}", "--gid", "${MKENV_GID}", "-m", "${MKENV_USERNAME}"}}),
 		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"mkdir", "-p", "${MKENV_LOCAL_BIN}"}}),
 		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"chown", "-R", "${MKENV_USERNAME}:${MKENV_USERNAME}", "${MKENV_LOCAL_BIN}"}}),
-		// Create mkenv state directory for host log file bind mount
-		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"mkdir", "-p", "${MKENV_HOME}/.local/state/mkenv"}}),
-		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"chown", "-R", "${MKENV_USERNAME}:${MKENV_USERNAME}", "${MKENV_HOME}/.local/state/mkenv"}}),
+		// Create .local directories for various tools (nvim, virtualenvs, mkenv, etc.)
+		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"mkdir", "-p", "${MKENV_HOME}/.local/share", "${MKENV_HOME}/.local/state"}}),
+		bricksengine.WithRootRun(bricksengine.Command{When: "build", Argv: []string{"chown", "-R", "${MKENV_USERNAME}:${MKENV_USERNAME}", "${MKENV_HOME}/.local"}}),
 		bricksengine.WithFileTemplate(bricksengine.FileTemplate{
 			ID:       "system config",
 			FilePath: "rc",

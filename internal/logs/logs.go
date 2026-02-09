@@ -24,7 +24,7 @@ func SetComponent(name string) {
 func Init() {
 	initOnce.Do(func() {
 		logLevel := ui.LogLevelWarn
-		if version.Get() == "dev" {
+		if version.Get() == "local" {
 			logLevel = ui.LogLevelDebugVerbose
 		}
 
@@ -36,7 +36,7 @@ func Init() {
 			Component:  component,
 		}
 		logger = ui.New(opts)
-		logger.Debug("logs initialized with opts %v", opts)
+		logger.DebugSilent("logs initialized with opts %v", opts)
 	})
 }
 

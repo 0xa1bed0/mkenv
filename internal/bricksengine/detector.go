@@ -19,11 +19,32 @@ type LangDetector interface {
 	ScanFiles(folderPtr filesmanager.FileManager) (found bool, brickMeta map[string]string, err error)
 }
 
+// VersionSemantics controls how detected version strings are interpreted.
+type VersionSemantics string
+
+const (
+	// VersionSemanticsConstraint treats versions as exact constraints (default).
+	VersionSemanticsConstraint VersionSemantics = "constraint"
+	// VersionSemanticsMinimum treats versions as minimum requirements (prepends >=).
+	VersionSemanticsMinimum VersionSemantics = "minimum"
+)
+
+// LangDetectorOption configures a langDetector.
+type LangDetectorOption func(*langDetector)
+
+// WithVersionSemantics sets how detected version strings are interpreted.
+func WithVersionSemantics(s VersionSemantics) LangDetectorOption {
+	return func(ld *langDetector) {
+		ld.versionSemantics = s
+	}
+}
+
 type langDetector struct {
-	brickName      string
-	targetFile     string
-	fileExtentions string // coma separated (e.g. ts,js,jsx)
-	versionPrefix  string
+	brickName        string
+	targetFile       string
+	fileExtentions   string // coma separated (e.g. ts,js,jsx)
+	versionPrefix    string
+	versionSemantics VersionSemantics
 }
 
 func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found bool, brickMeta map[string]string, err error) {
@@ -35,7 +56,7 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 	versionPrefix := ld.versionPrefix
 
 	// TODO: maybe we should have global set of folders we ignore?
-	ignorePath := []string{"vendor", "node_modules"}
+	ignorePath := []string{"vendor", "node_modules", ".gomod"}
 
 	if fileExtentions != "" {
 		hasFiles, er := folderPtr.HasFilesWithExtensions(fileExtentions, ignorePath)
@@ -86,8 +107,12 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 			return false, nil, defineVersionError
 		}
 
-		logs.Debugf("detector[%s]: found version %q in %s", ld.brickName, string(version), gomod)
-		versionsFound = append(versionsFound, string(version))
+		v := string(version)
+		if ld.versionSemantics == VersionSemanticsMinimum {
+			v = ">=" + v
+		}
+		logs.Debugf("detector[%s]: found version %q in %s", ld.brickName, v, gomod)
+		versionsFound = append(versionsFound, v)
 	}
 
 	brickMeta = make(map[string]string)
@@ -110,11 +135,16 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 	return true, brickMeta, nil
 }
 
-func NewLangDetector(brickName, targetFile, fileExtentions, versionPrefix string) LangDetector {
-	return &langDetector{
-		brickName:      brickName,
-		targetFile:     targetFile,
-		fileExtentions: fileExtentions,
-		versionPrefix:  versionPrefix,
+func NewLangDetector(brickName, targetFile, fileExtentions, versionPrefix string, opts ...LangDetectorOption) LangDetector {
+	ld := &langDetector{
+		brickName:        brickName,
+		targetFile:       targetFile,
+		fileExtentions:   fileExtentions,
+		versionPrefix:    versionPrefix,
+		versionSemantics: VersionSemanticsConstraint,
 	}
+	for _, opt := range opts {
+		opt(ld)
+	}
+	return ld
 }

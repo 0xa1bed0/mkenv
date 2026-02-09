@@ -2,15 +2,31 @@
 TARGET_OS   ?= darwin
 TARGET_ARCH ?= arm64
 
-VERSION ?= dev
-
 # Output dirs
 HOST_OUT   := dist/$(TARGET_OS)-$(TARGET_ARCH)
 AGENT_OUT  := internal/agentdist/bin
 
+# Git commit hash (empty if not in a git repo or zip download)
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
 
-# Default target: build everything
-all: fmt agent host
+# Version for user builds: compiled-<commit> if git available, otherwise compiled
+USER_VERSION := $(if $(GIT_COMMIT),compiled-$(GIT_COMMIT),compiled)
+
+# Default target: build for users
+all: fmt agent host-user
+
+# Development build (for mkenv developers)
+dev: fmt agent host-dev
+
+host-user:
+	mkdir -p $(HOST_OUT)
+	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=0 \
+		go build -ldflags "-X github.com/0xa1bed0/mkenv/internal/version.Version=$(USER_VERSION)" -o $(HOST_OUT)/mkenv ./cmd/mkenv
+
+host-dev:
+	mkdir -p $(HOST_OUT)
+	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=0 \
+		go build -ldflags "-X github.com/0xa1bed0/mkenv/internal/version.Version=local" -o $(HOST_OUT)/mkenv ./cmd/mkenv
 
 fmt:
 	go fmt ./...
@@ -36,9 +52,12 @@ agent:
 	rm -f /tmp/mkenv-agent-amd64 /tmp/mkenv-agent-arm64
 
 # -------------------------
-# Build ONE host binary (cmd/mkenv)
+# Build host binary with explicit version (used by CI)
 # -------------------------
 host:
+ifndef VERSION
+	$(error VERSION is required for 'make host'. Use 'make' for user builds or 'make dev' for development)
+endif
 	mkdir -p $(HOST_OUT)
 	GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH) CGO_ENABLED=0 \
 		go build -ldflags "-X github.com/0xa1bed0/mkenv/internal/version.Version=$(VERSION)" -o $(HOST_OUT)/mkenv ./cmd/mkenv

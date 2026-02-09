@@ -107,6 +107,6 @@ func (gd *golangDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine
 func init() {
 	bricksengine.RegisterBrick(golangID, NewGolang)
 	bricksengine.RegisterDetector(func() bricksengine.BrickDetector {
-		return &golangDetector{langDetector: bricksengine.NewLangDetector(string(golangID), "go.mod", "go", "go ")}
+		return &golangDetector{langDetector: bricksengine.NewLangDetector(string(golangID), "go.mod", "go", "go ", bricksengine.WithVersionSemantics(bricksengine.VersionSemanticsMinimum))}
 	})
 }

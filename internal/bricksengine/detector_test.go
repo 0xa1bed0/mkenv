@@ -186,7 +186,7 @@ func TestLangDetector_Golang_SingleGoModWithVersion(t *testing.T) {
 		"main.go": "package main\n",
 	})
 
-	detector := NewLangDetector("golang", "go.mod", "go", "go ")
+	detector := NewLangDetector("golang", "go.mod", "go", "go ", WithVersionSemantics(VersionSemanticsMinimum))
 	found, meta, err := detector.ScanFiles(fm)
 
 	if err != nil {
@@ -213,7 +213,7 @@ func TestLangDetector_Golang_MultipleGoMod_FirstWithoutVersion(t *testing.T) {
 		"subpkg/subpkg.go": "package subpkg\n",
 	})
 
-	detector := NewLangDetector("golang", "go.mod", "go", "go ")
+	detector := NewLangDetector("golang", "go.mod", "go", "go ", WithVersionSemantics(VersionSemanticsMinimum))
 	found, meta, err := detector.ScanFiles(fm)
 
 	if err != nil {
@@ -239,7 +239,7 @@ func TestLangDetector_Golang_MultipleGoModWithConflicts(t *testing.T) {
 		"main.go":       "package main\n",
 	})
 
-	detector := NewLangDetector("golang", "go.mod", "go", "go ")
+	detector := NewLangDetector("golang", "go.mod", "go", "go ", WithVersionSemantics(VersionSemanticsMinimum))
 	found, meta, err := detector.ScanFiles(fm)
 
 	if err != nil {
@@ -264,7 +264,7 @@ func TestLangDetector_Golang_NoGoModButGoFilesExist(t *testing.T) {
 		"util.go": "package main\n",
 	})
 
-	detector := NewLangDetector("golang", "go.mod", "go", "go ")
+	detector := NewLangDetector("golang", "go.mod", "go", "go ", WithVersionSemantics(VersionSemanticsMinimum))
 	found, meta, err := detector.ScanFiles(fm)
 
 	if err != nil {
@@ -377,7 +377,7 @@ func TestLangDetector_IgnoresVendorAndNodeModules(t *testing.T) {
 		"vendor/vendored.go": "package vendored\n",
 	})
 
-	detector := NewLangDetector("golang", "go.mod", "go", "go ")
+	detector := NewLangDetector("golang", "go.mod", "go", "go ", WithVersionSemantics(VersionSemanticsMinimum))
 	found, meta, err := detector.ScanFiles(fm)
 
 	if err != nil {
@@ -406,6 +406,60 @@ func TestLangDetector_NoFilesAtAll(t *testing.T) {
 	}
 	if found {
 		t.Error("expected found=false for empty directory")
+	}
+}
+
+func TestLangDetector_Golang_MultipleGoModDifferentVersions_MinimumSemantics(t *testing.T) {
+	t.Parallel()
+
+	// Multiple go.mod files with different Go versions should NOT conflict
+	// when using minimum-version semantics. The detector should pick the max.
+	fm := newStubFileManager(map[string]string{
+		"go.mod":         "module example.com/root\n\ngo 1.25.3\n",
+		"lib/go.mod":     "module example.com/lib\n\ngo 1.21\n",
+		"tools/go.mod":   "module example.com/tools\n\ngo 1.23.0\n",
+		"main.go":        "package main\n",
+		"lib/lib.go":     "package lib\n",
+		"tools/tools.go": "package tools\n",
+	})
+
+	detector := NewLangDetector("golang", "go.mod", "go", "go ", WithVersionSemantics(VersionSemanticsMinimum))
+	found, meta, err := detector.ScanFiles(fm)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Error("expected found=true")
+	}
+	if meta["version"] != "1.25.3" {
+		t.Errorf("expected version=1.25.3 (max of 1.25.3, 1.21, 1.23.0), got %s", meta["version"])
+	}
+}
+
+func TestLangDetector_IgnoresGomodDir(t *testing.T) {
+	t.Parallel()
+
+	// Files in .gomod/ should be ignored (dependency cache)
+	fm := newStubFileManager(map[string]string{
+		"go.mod":             "module example.com/test\n\ngo 1.25.3\n",
+		"main.go":            "package main\n",
+		".gomod/dep1/go.mod": "module dep1\n\ngo 1.21\n",
+		".gomod/dep2/go.mod": "module dep2\n\ngo 1.23.0\n",
+	})
+
+	detector := NewLangDetector("golang", "go.mod", "go", "go ", WithVersionSemantics(VersionSemanticsMinimum))
+	found, meta, err := detector.ScanFiles(fm)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Error("expected found=true")
+	}
+	// Should only see 1.25.3 from root, .gomod/ files should be ignored
+	if meta["version"] != "1.25.3" {
+		t.Errorf("expected version=1.25.3 (ignoring .gomod/), got %s", meta["version"])
 	}
 }
 

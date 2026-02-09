@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/utils"
+	"github.com/0xa1bed0/mkenv/internal/version"
 )
 
 type Dockerfile []string
@@ -172,6 +173,7 @@ func (plan *BuildPlan) GenerateDockerfile() Dockerfile {
 		lines = append(lines, fmt.Sprintf("LABEL mkenv_cache_file_store=\"%s\"", cacheFileStoreDir))
 	}
 
+	lines = append(lines, fmt.Sprintf("LABEL %s=\"%d\"", version.ImageSchemaVersionLabel, version.ImageSchemaVersion))
 	lines = append(lines, "LABEL mkenv=true")
 
 	return lines

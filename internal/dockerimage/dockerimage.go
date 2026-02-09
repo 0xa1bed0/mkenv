@@ -8,6 +8,7 @@ import (
 	"github.com/0xa1bed0/mkenv/internal/dockerfile"
 	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/runtime"
+	"github.com/0xa1bed0/mkenv/internal/version"
 )
 
 type DockerImageResolver struct {
@@ -53,11 +54,19 @@ func (dib *DockerImageResolver) ResolveImageID(ctx context.Context, project *run
 			exists := dib.dockerClient.ImageExists(ctx, string(idByRunConfig))
 			logs.Debugf("checking if image exists in Docker: imageRef=%s, exists=%v", idByRunConfig, exists)
 			if exists {
-				logs.Debugf("cache hit: returning existing image %s", idByRunConfig)
-				return idByRunConfig, nil
+				if !dib.dockerClient.IsImageSchemaCompatible(ctx, string(idByRunConfig)) {
+					oldSchema := dib.dockerClient.GetImageSchemaVersion(ctx, string(idByRunConfig))
+					logs.Infof("Cached image has incompatible schema version (image=%d, current mkenv=%d), rebuilding...", oldSchema, version.ImageSchemaVersion)
+					dib.imageCache.delete(ctx, runConfigCacheKey)
+					// fall through to rebuild
+				} else {
+					logs.Debugf("cache hit: returning existing image %s", idByRunConfig)
+					return idByRunConfig, nil
+				}
+			} else {
+				logs.Debugf("image not found in Docker, deleting stale cache entry: key=%s", runConfigCacheKey)
+				dib.imageCache.delete(ctx, runConfigCacheKey)
 			}
-			logs.Debugf("image not found in Docker, deleting stale cache entry: key=%s", runConfigCacheKey)
-			dib.imageCache.delete(ctx, runConfigCacheKey)
 		}
 
 		// TODO: think of dependency injection and unit tests if necessary. We want planner initialize lazy
@@ -86,13 +95,20 @@ func (dib *DockerImageResolver) ResolveImageID(ctx context.Context, project *run
 			exists := dib.dockerClient.ImageExists(ctx, string(idByDockerfile))
 			logs.Debugf("checking if dockerfile-cached image exists: imageRef=%s, exists=%v", idByDockerfile, exists)
 			if exists {
-				logs.Debugf("dockerfile cache hit: linking project cache and returning image %s", idByDockerfile)
-				dib.imageCache.set(ctx, runConfigCacheKey, idByDockerfile)
-				return idByDockerfile, nil
+				if !dib.dockerClient.IsImageSchemaCompatible(ctx, string(idByDockerfile)) {
+					oldSchema := dib.dockerClient.GetImageSchemaVersion(ctx, string(idByDockerfile))
+					logs.Infof("Dockerfile-cached image has incompatible schema version (image=%d, current mkenv=%d), rebuilding...", oldSchema, version.ImageSchemaVersion)
+					dib.imageCache.delete(ctx, dockerfileCacheKey)
+					// fall through to rebuild
+				} else {
+					logs.Debugf("dockerfile cache hit: linking project cache and returning image %s", idByDockerfile)
+					dib.imageCache.set(ctx, runConfigCacheKey, idByDockerfile)
+					return idByDockerfile, nil
+				}
+			} else {
+				logs.Debugf("dockerfile-cached image not in Docker, deleting stale entry: key=%s", dockerfileCacheKey)
+				dib.imageCache.delete(ctx, dockerfileCacheKey)
 			}
-
-			logs.Debugf("dockerfile-cached image not in Docker, deleting stale entry: key=%s", dockerfileCacheKey)
-			dib.imageCache.delete(ctx, dockerfileCacheKey)
 		}
 
 		if found && idByDockerfile.IsBuilding() {

@@ -212,6 +212,11 @@ func (l *Logger) Debug(format string, args ...any) {
 	}
 }
 
+// DebugSilent writes a debug-level message to the full log writer only, never to stdout.
+func (l *Logger) DebugSilent(format string, args ...any) {
+	l.printLog(true, "DEBG", l.style.logInfo, format, args...)
+}
+
 func (l *Logger) SetLogLevel(logLevel LogLevel) {
 	l.logLevel = logLevel
 }

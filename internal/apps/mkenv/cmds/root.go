@@ -4,12 +4,19 @@ import (
 	runcmd "github.com/0xa1bed0/mkenv/internal/apps/mkenv/cmds/run"
 	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/runtime"
+	"github.com/0xa1bed0/mkenv/internal/versioncheck"
 	"github.com/spf13/cobra"
 )
 
 var verbosity int
 
 func Execute(rt *runtime.Runtime) error {
+	// Start version check in background
+	versionCheckCh := make(chan *versioncheck.Result, 1)
+	go func() {
+		versionCheckCh <- versioncheck.Check(rt.Ctx())
+	}()
+
 	rootCmd := &cobra.Command{
 		Use:   "mkenv [PATH]",
 		Short: "Instant dev containers for your project",
@@ -43,5 +50,15 @@ If PATH is omitted, the current working directory is used.`,
 	rootCmd.AddCommand(newCleanCmd())
 	rootCmd.AddCommand(newVersionCmd())
 
-	return rootCmd.ExecuteContext(rt.Ctx())
+	err := rootCmd.ExecuteContext(rt.Ctx())
+
+	// Print update banner after command execution (non-blocking)
+	select {
+	case result := <-versionCheckCh:
+		versioncheck.PrintUpdateBanner(result)
+	default:
+		// Version check still running, don't wait
+	}
+
+	return err
 }

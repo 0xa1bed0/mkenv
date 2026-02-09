@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	sandbox "github.com/0xa1bed0/mkenv/internal/apps/sandbox/cmds"
 	"github.com/0xa1bed0/mkenv/internal/logs"
@@ -28,7 +29,7 @@ func main() {
 
 func detectComponent(base string) string {
 	if len(os.Args) > 1 && len(os.Args[1]) > 0 && os.Args[1][0] != '-' {
-		return base + ":" + os.Args[1]
+		return base + ":" + strings.Join(os.Args[1:], " ")
 	}
 	return base
 }

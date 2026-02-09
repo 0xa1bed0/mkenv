@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
 	"github.com/0xa1bed0/mkenv/internal/bricks/systems"
@@ -147,8 +148,39 @@ func (co *ContainerOrchestrator) getEnvVars() []string {
 	reverseProxyEnv := fmt.Sprintf("MKENV_REVERSE_PROXY=host.docker.internal:%d", reverseProxyPort)
 	envs = append(envs, reverseProxyEnv)
 
+	// Pass host timezone so container timestamps match the host
+	if tz := hostTimezone(); tz != "" {
+		envs = append(envs, "TZ="+tz)
+	}
+
 	logs.Debugf("Container env vars: %v", envs)
 	return envs
+}
+
+// hostTimezone returns the IANA timezone name of the host (e.g. "Europe/Kyiv").
+// Works on both macOS and Linux.
+func hostTimezone() string {
+	if tz := os.Getenv("TZ"); tz != "" {
+		return tz
+	}
+	// macOS: /etc/localtime -> /var/db/timezone/zoneinfo/<tz>
+	// Linux: /etc/localtime -> /usr/share/zoneinfo/<tz>
+	if target, err := os.Readlink("/etc/localtime"); err == nil {
+		if idx := strings.Index(target, "zoneinfo/"); idx != -1 {
+			return target[idx+len("zoneinfo/"):]
+		}
+	}
+	// Linux (Debian/Ubuntu): /etc/timezone contains the IANA name directly
+	if data, err := os.ReadFile("/etc/timezone"); err == nil {
+		if tz := strings.TrimSpace(string(data)); tz != "" {
+			return tz
+		}
+	}
+	// Fallback to Go's detected location
+	if name := time.Now().Location().String(); name != "Local" {
+		return name
+	}
+	return ""
 }
 
 func (co *ContainerOrchestrator) onPortSnapshot() (string, protocol.ControlCommandHandler) {

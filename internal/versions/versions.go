@@ -112,3 +112,15 @@ func max(a, b int) int {
 	}
 	return b
 }
+
+// Compare compares two version strings.
+// Returns 1 if a > b, -1 if a < b, 0 if equal.
+// Comparison is numeric per segment; missing segments are treated as 0.
+func Compare(a, b string) int {
+	return compareVersions(a, b)
+}
+
+// IsValidVersion checks if a version string is valid (digits and dots only, no empty segments).
+func IsValidVersion(v string) bool {
+	return isValidVersion(v)
+}
