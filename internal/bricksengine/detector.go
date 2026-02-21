@@ -137,13 +137,17 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 		logs.Debugf("detector[%s]: all versions found: %v", ld.brickName, versionsFound)
 		versionToInstall, err := versions.MaxVersionFromConstraints(versionsFound)
 		if err != nil {
-			if !errors.Is(err, versions.ErrConflictingConstraints) {
-				return false, nil, err
+			if errors.Is(err, versions.ErrConflictingConstraints) {
+				logs.Warnf("Found evidence of conflicting versions for %s. Using the biggest one: %s", ld.brickName, versionToInstall)
+			} else {
+				logs.Warnf("Failed to parse version constraints %v for %s: %v. Using known latest", versionsFound, ld.brickName, err)
+				versionToInstall = ""
 			}
-			logs.Warnf("Found evidence of conflicting versions for %s. Using the biggest one: %s", ld.brickName, versionToInstall)
 		}
-		logs.Debugf("detector[%s]: selected version %s", ld.brickName, versionToInstall)
-		brickMeta["version"] = versionToInstall
+		if versionToInstall != "" {
+			logs.Debugf("detector[%s]: selected version %s", ld.brickName, versionToInstall)
+			brickMeta["version"] = versionToInstall
+		}
 	} else {
 		logs.Warnf("Can't estimate version for %s. Using known latest", ld.brickName)
 	}
