@@ -84,6 +84,15 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 		return unicode.IsDigit(rune(b)) || b == '.' || b == '>' || b == '<' || b == '=' || b == '^' || b == '|'
 	}
 
+	hasDigit := func(s string) bool {
+		for _, r := range s {
+			if unicode.IsDigit(r) {
+				return true
+			}
+		}
+		return false
+	}
+
 	versionsFound := []string{}
 
 	for _, gomod := range result {
@@ -108,6 +117,13 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 		}
 
 		v := string(version)
+
+		// Skip invalid version strings (e.g. "." extracted from paths like "./modules/index.js")
+		if !hasDigit(v) {
+			logs.Debugf("detector[%s]: skipping invalid version %q in %s (no digits)", ld.brickName, v, gomod)
+			continue
+		}
+
 		if ld.versionSemantics == VersionSemanticsMinimum {
 			v = ">=" + v
 		}
