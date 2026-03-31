@@ -24,7 +24,7 @@ func NewClaudeCode(metadata map[string]string) (bricksengine.Brick, error) {
 		}),
 		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
-			Argv: []string{"ln", "-sf", "${MKENV_HOME}/.claude/bin/claude", "${MKENV_LOCAL_BIN}/claude"},
+			Argv: []string{"ln", "-sf", "${MKENV_HOME}/.local/bin/claude", "${MKENV_LOCAL_BIN}/claude"},
 		}),
 	)
 	if err != nil {
