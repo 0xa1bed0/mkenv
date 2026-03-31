@@ -20,7 +20,7 @@ func NewClaudeCode(metadata map[string]string) (bricksengine.Brick, error) {
 		bricksengine.WithCacheFile("${MKENV_HOME}/.claude.json"),
 		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
-			Argv: []string{"sh", "-c", "curl -fsSL https://claude.ai/install.sh | sh"},
+			Argv: []string{"bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash"},
 		}),
 		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
