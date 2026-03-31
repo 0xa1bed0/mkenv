@@ -88,6 +88,7 @@ func (p *folderPtr) HasFilesWithExtensions(extsCSV string, ignorePaths []string)
 
 	// Normalize ignore list (same logic as in FindFile)
 	ignoreAbs := make([]string, 0, len(ignorePaths))
+	ignoreNames := make(map[string]struct{})
 	for _, q := range ignorePaths {
 		if q == "" {
 			continue
@@ -103,6 +104,10 @@ func (p *folderPtr) HasFilesWithExtensions(extsCSV string, ignorePaths []string)
 			abs = p.ops.Path.Join(p.root, q)
 		}
 		ignoreAbs = append(ignoreAbs, p.ops.Path.Clean(abs))
+		// Simple names (no path separators) also match any directory at any depth
+		if q != "" && !strings.ContainsAny(q, `/\`) && q != "." && q != ".." {
+			ignoreNames[q] = struct{}{}
+		}
 	}
 	shouldSkip := func(absPath string, isDir bool) (skipNode, skipTree bool) {
 		for _, ig := range ignoreAbs {
@@ -111,6 +116,12 @@ func (p *folderPtr) HasFilesWithExtensions(extsCSV string, ignorePaths []string)
 					return true, true
 				}
 				return true, false
+			}
+		}
+		// Simple names match any directory with that base name at any depth
+		if isDir {
+			if _, ok := ignoreNames[filepath.Base(absPath)]; ok {
+				return true, true
 			}
 		}
 		return false, false
@@ -178,13 +189,14 @@ func (ptr *folderPtr) FindFile(filename string, ignorePaths []string) ([]string,
 	// Normalize ignore list to absolute-cleaned paths under fm.root.
 	// We treat entries as relative to root; absolute entries outside root are ignored.
 	ignoreAbs := make([]string, 0, len(ignorePaths))
+	ignoreNames := make(map[string]struct{})
 	for _, p := range ignorePaths {
 		if p == "" {
 			continue
 		}
 		var abs string
 		if ptr.ops.Path.IsAbs(p) {
-			// Only accept if it’s inside the root.
+			// Only accept if it's inside the root.
 			rel, err := ptr.ops.Path.Rel(ptr.root, p)
 			if err != nil || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
 				// Path outside root – ignore silently.
@@ -195,6 +207,10 @@ func (ptr *folderPtr) FindFile(filename string, ignorePaths []string) ([]string,
 			abs = ptr.ops.Path.Join(ptr.root, p)
 		}
 		ignoreAbs = append(ignoreAbs, ptr.ops.Path.Clean(abs))
+		// Simple names (no path separators) also match any directory at any depth
+		if p != "" && !strings.ContainsAny(p, `/\`) && p != "." && p != ".." {
+			ignoreNames[p] = struct{}{}
+		}
 	}
 
 	// Helper: should skip this path or its subtree?
@@ -206,6 +222,12 @@ func (ptr *folderPtr) FindFile(filename string, ignorePaths []string) ([]string,
 					return true, true // skip dir subtree
 				}
 				return true, false // skip file
+			}
+		}
+		// Simple names match any directory with that base name at any depth
+		if isDir {
+			if _, ok := ignoreNames[filepath.Base(absPath)]; ok {
+				return true, true
 			}
 		}
 		return false, false

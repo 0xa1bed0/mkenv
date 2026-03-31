@@ -12,6 +12,7 @@ import (
 	"time"
 
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
+	sandboxappconfig "github.com/0xa1bed0/mkenv/internal/apps/sandbox/config"
 	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/networking/host"
 	"github.com/0xa1bed0/mkenv/internal/runtime"
@@ -101,7 +102,7 @@ func (dc *DockerClient) ListContainers(ctx context.Context, project *runtime.Pro
 	return out, nil
 }
 
-func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Project, imageTag string, envs, binds []string) (containerID string, containerPortReservation *host.PortReservation, err error) {
+func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Project, imageTag string, envs, binds, groupAdd []string) (containerID string, containerPortReservation *host.PortReservation, err error) {
 	// Use folder name as hostname for friendly display in shell prompts
 	hostname := sanitizeHostname(filepath.Base(project.Path()))
 
@@ -133,7 +134,8 @@ func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Pr
 	}
 
 	hostCfg := &container.HostConfig{
-		Binds: binds,
+		Binds:    binds,
+		GroupAdd: groupAdd,
 		PortBindings: nat.PortMap{
 			nat.Port(strconv.Itoa(hostappconfig.ContainerProxyPort()) + "/tcp"): []nat.PortBinding{
 				{
@@ -159,6 +161,81 @@ func (dc *DockerClient) CreateContainer(ctx context.Context, project *runtime.Pr
 	}
 
 	// Track mounted paths to avoid duplicates
+	mountedPaths := make(map[string]bool)
+
+	for _, vol := range volumes {
+		if mountedPaths[vol.MountPath] {
+			continue
+		}
+		mountedPaths[vol.MountPath] = true
+		hostCfg.Mounts = append(hostCfg.Mounts, mount.Mount{
+			Type:   mount.TypeVolume,
+			Source: vol.Name,
+			Target: vol.MountPath,
+		})
+	}
+
+	if cacheFileStore != nil && !mountedPaths[cacheFileStore.MountPath] {
+		hostCfg.Mounts = append(hostCfg.Mounts, mount.Mount{
+			Type:   mount.TypeVolume,
+			Source: cacheFileStore.Name,
+			Target: cacheFileStore.MountPath,
+		})
+	}
+
+	created, err := dc.client.ContainerCreate(ctx, cfg, hostCfg, nil, nil, resolveContainerName(project.Name()))
+	if err != nil {
+		return
+	}
+	containerID = created.ID
+
+	return
+}
+
+func (dc *DockerClient) CreateCommandContainer(ctx context.Context, project *runtime.Project, imageTag string, envs, binds, groupAdd []string, command string) (containerID string, err error) {
+	hostname := sanitizeHostname(filepath.Base(project.Path()))
+
+	cfg := &container.Config{
+		Image:    imageTag,
+		Hostname: hostname,
+		Env:      envs,
+
+		// Source .mkenvrc so that version managers (gvm, nvm, pyenv, etc.) and
+		// PATH additions written by bricks are active before the user's command runs.
+		// This mirrors what the interactive shell does: zsh → .zshrc → .mkenvrc.
+		// Using bash (always present on Debian) avoids TTY/job-control warnings
+		// that zsh -i produces in non-interactive contexts.
+		Entrypoint: []string{"/bin/bash", "-c"},
+		Cmd:        []string{`. "` + sandboxappconfig.HomeFolder + `/.mkenvrc" 2>/dev/null; ` + command},
+
+		Tty:          false,
+		OpenStdin:    false,
+		AttachStdin:  false,
+		AttachStdout: true,
+		AttachStderr: true,
+		Labels: map[string]string{
+			"mkenv.project": project.Name(),
+		},
+	}
+
+	hostCfg := &container.HostConfig{
+		Binds:    binds,
+		GroupAdd: groupAdd,
+		ExtraHosts: []string{
+			"host.docker.internal:host-gateway",
+		},
+	}
+
+	volumes, err := dc.resolveCacheVolumes(ctx, imageTag, project)
+	if err != nil {
+		return
+	}
+
+	cacheFileStore, err := dc.resolveCacheFileStore(ctx, imageTag, project)
+	if err != nil {
+		return
+	}
+
 	mountedPaths := make(map[string]bool)
 
 	for _, vol := range volumes {

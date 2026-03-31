@@ -234,8 +234,31 @@ claude</code></pre>
                     <td>Preferred entrypoint (e.g. "tmux")</td>
                     <td>none</td>
                 </tr>
+                <tr>
+                    <td><code>--command</code> / <code>-c</code></td>
+                    <td>string</td>
+                    <td>Run a single command inside the environment and exit (non-interactive). Stdout/stderr are streamed; the host process exits with the command's exit code.</td>
+                    <td>none</td>
+                </tr>
             </tbody>
         </table>
+
+        <h3>One-off command execution (<code>-c</code>)</h3>
+        <p>Run a single command inside the mkenv environment without opening an interactive shell. Useful for CI pipelines, git pre-commit hooks, and one-off builds where the runtimes are not installed on the host.</p>
+        <pre><code># Run a single command and exit
+mkenv . -c "make precommit"
+
+# Use in a git pre-commit hook
+mkenv . -c "npm test"
+
+# Exit code from the command propagates to the host
+mkenv . -c "exit 42"; echo $?   # prints 42</code></pre>
+        <ul>
+            <li>No interactive shell or TTY — stdout/stderr are streamed directly.</li>
+            <li>No control plane or reverse proxy is started (shorter startup).</li>
+            <li>Container is removed on exit, same as interactive mode.</li>
+        </ul>
+
         <h3><code>mkenv attach</code></h3>
         <p>Open an additional shell in an already-running container for the same project.</p>
         <pre><code>mkenv attach [PATH]</code></pre>

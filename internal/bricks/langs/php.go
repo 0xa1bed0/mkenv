@@ -41,27 +41,53 @@ func NewPHP(metadata map[string]string) (bricksengine.Brick, error) {
 }
 
 type phpDetector struct {
-	langDetector bricksengine.LangDetector
+	phpVersionDetector bricksengine.LangDetector // .php-version (priority)
+	langDetector       bricksengine.LangDetector // composer.json (fallback)
 }
 
 func (*phpDetector) BrickInfo() *bricksengine.BrickInfo {
 	return bricksengine.NewBrickInfo(phpID, phpDescription, phpKinds)
 }
 
-func (gd *phpDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine.BrickID, map[string]string, error) {
-	found, brickMeta, err := gd.langDetector.ScanFiles(folderPtr)
+func (pd *phpDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine.BrickID, map[string]string, error) {
+	// Priority: check .php-version first
+	pvFound, pvMeta, err := pd.phpVersionDetector.ScanFiles(folderPtr)
 	if err != nil {
 		return "", nil, err
 	}
-	if found {
-		return phpID, brickMeta, nil
+
+	pvVersion := ""
+	if pvMeta != nil {
+		pvVersion = pvMeta["version"]
 	}
-	return "", nil, nil
+
+	// If .php-version has a version, use it
+	if pvVersion != "" {
+		return phpID, pvMeta, nil
+	}
+
+	// Fallback: check composer.json
+	fallbackFound, fallbackMeta, err := pd.langDetector.ScanFiles(folderPtr)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if !pvFound && !fallbackFound {
+		return "", nil, nil
+	}
+
+	return phpID, fallbackMeta, nil
 }
 
 func init() {
 	bricksengine.RegisterBrick(phpID, NewPHP)
 	bricksengine.RegisterDetector(func() bricksengine.BrickDetector {
-		return &phpDetector{langDetector: bricksengine.NewLangDetector(string(phpID), "composer.json", "php", `"php": "`)}
+		return &phpDetector{
+			phpVersionDetector: bricksengine.NewLangDetector(
+				string(phpID), ".php-version", "php", "",
+				bricksengine.WithVersionSemantics(bricksengine.VersionSemanticsMinimum),
+			),
+			langDetector: bricksengine.NewLangDetector(string(phpID), "composer.json", "php", `"php": "`),
+		}
 	})
 }

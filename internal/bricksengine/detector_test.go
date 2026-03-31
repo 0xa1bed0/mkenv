@@ -543,6 +543,32 @@ func TestLangDetector_Nodejs_OnlyInvalidVersions_NoError(t *testing.T) {
 	}
 }
 
+func TestLangDetector_IgnoresDeepNodeModules(t *testing.T) {
+	t.Parallel()
+
+	// node_modules at any depth should be ignored
+	fm := newStubFileManager(map[string]string{
+		"go.mod":                             "module example.com/test\n\ngo 1.21\n",
+		"main.go":                            "package main\n",
+		"src/infra/node_modules/pkg/go.mod":  "module pkg\n\ngo 1.18\n",
+		"src/infra/node_modules/pkg/main.go": "package main\n",
+	})
+
+	detector := NewLangDetector("golang", "go.mod", "go", "go ", WithVersionSemantics(VersionSemanticsMinimum))
+	found, meta, err := detector.ScanFiles(fm)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Error("expected found=true")
+	}
+	// Should use 1.21 from root, not 1.18 from deep node_modules
+	if meta["version"] != "1.21.0" {
+		t.Errorf("expected version=1.21.0 (ignoring deep node_modules), got %s", meta["version"])
+	}
+}
+
 func TestLangDetector_ErrorsOnMissingTargetAndExtensions(t *testing.T) {
 	t.Parallel()
 

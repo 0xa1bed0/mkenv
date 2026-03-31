@@ -125,7 +125,8 @@ command -v pyenv &>/dev/null && eval "$(pyenv init -)"
 }
 
 type pythonDetector struct {
-	langDetector bricksengine.LangDetector
+	pythonVersionDetector bricksengine.LangDetector // .python-version (priority)
+	langDetector          bricksengine.LangDetector // pyproject.toml etc (fallback)
 }
 
 func (*pythonDetector) BrickInfo() *bricksengine.BrickInfo {
@@ -133,19 +134,44 @@ func (*pythonDetector) BrickInfo() *bricksengine.BrickInfo {
 }
 
 func (pd *pythonDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine.BrickID, map[string]string, error) {
-	found, brickMeta, err := pd.langDetector.ScanFiles(folderPtr)
+	// Priority: check .python-version first
+	pvFound, pvMeta, err := pd.pythonVersionDetector.ScanFiles(folderPtr)
 	if err != nil {
 		return "", nil, err
 	}
-	if found {
-		return pythonID, brickMeta, nil
+
+	pvVersion := ""
+	if pvMeta != nil {
+		pvVersion = pvMeta["version"]
 	}
-	return "", nil, nil
+
+	// If .python-version has a version, use it
+	if pvVersion != "" {
+		return pythonID, pvMeta, nil
+	}
+
+	// Fallback: check pyproject.toml, requirements.txt, etc.
+	fallbackFound, fallbackMeta, err := pd.langDetector.ScanFiles(folderPtr)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if !pvFound && !fallbackFound {
+		return "", nil, nil
+	}
+
+	return pythonID, fallbackMeta, nil
 }
 
 func init() {
 	bricksengine.RegisterBrick(pythonID, NewPython)
 	bricksengine.RegisterDetector(func() bricksengine.BrickDetector {
-		return &pythonDetector{langDetector: bricksengine.NewLangDetector(string(pythonID), "requirements.txt,pyproject.toml,setup.py,Pipfile", "py", `python_requires`)}
+		return &pythonDetector{
+			pythonVersionDetector: bricksengine.NewLangDetector(
+				string(pythonID), ".python-version", "py", "",
+				bricksengine.WithVersionSemantics(bricksengine.VersionSemanticsMinimum),
+			),
+			langDetector: bricksengine.NewLangDetector(string(pythonID), "requirements.txt,pyproject.toml,setup.py,Pipfile", "py", `python_requires`),
+		}
 	})
 }

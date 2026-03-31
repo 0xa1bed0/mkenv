@@ -16,6 +16,12 @@ cd ~/projects/myapp && mkenv .
 
 Your `npm install`, `pip install`, LLM agents, and builds run isolated. Your credentials stay on your host.
 
+Run a single command inside the environment and exit — useful for CI, git hooks, and one-off builds:
+
+```sh
+mkenv . -c "make precommit"
+```
+
 ## Install
 
 **Prerequisites:** Docker Desktop or Docker Engine

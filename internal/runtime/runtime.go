@@ -279,6 +279,14 @@ func (rt *Runtime) Finalize(appName, helpHint string, execErr *error) {
 
 	// log first failure if any
 	if execErr != nil && *execErr != nil {
+		// If a one-off command exited with a non-zero code, propagate it silently
+		// (the command's own output was already streamed to stdout/stderr).
+		var exitCodeErr ExitCodeError
+		if errors.As(*execErr, &exitCodeErr) {
+			logs.Close()
+			os.Exit(exitCodeErr.Code)
+		}
+
 		logs.Errorf("%s error: %v", appName, *execErr)
 		if helpHint != "" {
 			fmt.Fprintln(os.Stderr, helpHint)

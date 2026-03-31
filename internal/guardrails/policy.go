@@ -5,20 +5,25 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 )
 
 type policy struct {
-	DisableBricks_      []bricksengine.BrickID                     `json:"disabled_bricks"`
-	EnableBricks_       []bricksengine.BrickID                     `json:"enabled_bricks"`
-	DisableAuto_        bool                                       `json:"disable_auto"`
-	BricksConfigs_      map[bricksengine.BrickID]map[string]string `json:"bricks_config"`
-	AllowedMounts_      []string                                   `json:"allowed_mount_paths"`  // if empty - allow all except forbidden globally
-	AllowedProjectRoot_ string                                     `json:"allowed_project_path"` // if empty - allow all except forbidden globally
-	IgnorePreferences_  bool                                       `json:"ignore_preferences"`
-	ReverseProxy_       *ReverseProxyPolicy                        `json:"reverse_proxy"`
+	DisableBricks_                   []bricksengine.BrickID                     `json:"disabled_bricks"`
+	EnableBricks_                    []bricksengine.BrickID                     `json:"enabled_bricks"`
+	DisableAuto_                     bool                                       `json:"disable_auto"`
+	BricksConfigs_                   map[bricksengine.BrickID]map[string]string `json:"bricks_config"`
+	AllowedMounts_                   []string                                   `json:"allowed_mount_paths"`  // if empty - allow all except forbidden globally
+	AllowedProjectRoot_              string                                     `json:"allowed_project_path"` // if empty - allow all except forbidden globally
+	IgnorePreferences_               bool                                       `json:"ignore_preferences"`
+	ReverseProxy_                    *ReverseProxyPolicy                        `json:"reverse_proxy"`
+	AllowDockerSocketMountingBypass_ bool                                       `json:"allow_docker_socket_mounting_bypass"`
+	ImageMaxAge_                     string                                     `json:"image_max_age"`
 }
 
 // ReverseProxyPolicy controls which host ports can be accessed from the container
@@ -75,6 +80,41 @@ func (p *policy) IgnorePreferences() bool {
 	return p.IgnorePreferences_
 }
 
+// AllowDockerSocketMountingBypass implements Policy.
+func (p *policy) AllowDockerSocketMountingBypass() bool {
+	return p.AllowDockerSocketMountingBypass_
+}
+
+// ImageMaxAge implements Policy.
+// Returns the maximum age for cached images. Default is 7 days.
+// A zero duration means the check is disabled.
+func (p *policy) ImageMaxAge() time.Duration {
+	if p.ImageMaxAge_ == "" {
+		return 7 * 24 * time.Hour // default: 7 days
+	}
+	if p.ImageMaxAge_ == "0" {
+		return 0 // disabled
+	}
+	d, err := parseDuration(p.ImageMaxAge_)
+	if err != nil {
+		return 7 * 24 * time.Hour // fallback to default on parse error
+	}
+	return d
+}
+
+// parseDuration parses a duration string supporting "Nd" (days) notation
+// in addition to Go's standard time.ParseDuration formats.
+func parseDuration(s string) (time.Duration, error) {
+	if strings.HasSuffix(s, "d") {
+		days, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
+		if err != nil {
+			return 0, err
+		}
+		return time.Duration(days) * 24 * time.Hour, nil
+	}
+	return time.ParseDuration(s)
+}
+
 type Policy interface {
 	DisableBricks() []bricksengine.BrickID
 	EnableBricks() []bricksengine.BrickID
@@ -84,6 +124,8 @@ type Policy interface {
 	AllowedProjectRoot() string
 	IgnorePreferences() bool
 	AllowReverseProxy(port int) bool
+	AllowDockerSocketMountingBypass() bool
+	ImageMaxAge() time.Duration
 }
 
 var defaultPolicy = policy{
@@ -113,7 +155,7 @@ func ensurePolicyLocked(path string) error {
 }
 
 func LoadPolicy() (Policy, error) {
-	policyPath, _ := filepath.Abs(hostappconfig.ConfigBasePath() + "policy.json")
+	policyPath, _ := filepath.Abs(filepath.Join(hostappconfig.ConfigBasePath(), "policy.json"))
 	if err := ensurePolicyLocked(policyPath); err != nil {
 		return nil, err
 	}

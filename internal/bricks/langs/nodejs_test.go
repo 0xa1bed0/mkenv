@@ -249,9 +249,49 @@ func TestNodejsDetector_PackageJsonAndNpmrc(t *testing.T) {
 	if brickID != nodejsID {
 		t.Errorf("expected brickID=%s, got %s", nodejsID, brickID)
 	}
-	// Should pick max of 16.0.0 and 18.0.0
+	// .npmrc is the priority source — should use 18.0.0 from .npmrc, skipping package.json
 	if meta["version"] != "18.0.0" {
-		t.Errorf("expected version=18.0.0 (max of package.json and .npmrc), got %s", meta["version"])
+		t.Errorf("expected version=18.0.0 (.npmrc priority), got %s", meta["version"])
+	}
+}
+
+func TestNodejsDetector_NpmrcPrioritySkipsTslibPackageJson(t *testing.T) {
+	t.Parallel()
+
+	// When .npmrc has a version, package.json (including tslib-style "node" exports) should be skipped
+	fm := newStubFileManager(map[string]string{
+		"package.json": `{
+  "name": "test-project",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}`,
+		"node_modules/tslib/package.json": `{
+  "name": "tslib",
+  "exports": {
+    ".": {
+      "import": {
+        "node": "./modules/index.js"
+      }
+    }
+  }
+}`,
+		".npmrc":   "node-version=20.0.0\n",
+		"index.js": "console.log('hello');\n",
+	})
+
+	detector := createNodejsDetector()
+	brickID, meta, err := detector.Scan(fm)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if brickID != nodejsID {
+		t.Errorf("expected brickID=%s, got %s", nodejsID, brickID)
+	}
+	// .npmrc priority: should use 20.0.0, completely skipping package.json scanning
+	if meta["version"] != "20.0.0" {
+		t.Errorf("expected version=20.0.0 (.npmrc priority over package.json), got %s", meta["version"])
 	}
 }
 

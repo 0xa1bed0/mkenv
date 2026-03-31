@@ -15,6 +15,7 @@ import (
 	"github.com/0xa1bed0/mkenv/internal/logs"
 	"github.com/0xa1bed0/mkenv/internal/runtime"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 // setTerminalTitle sets the terminal tab/window title using ANSI escape sequences.
@@ -238,6 +239,56 @@ func (dc *DockerClient) RunContainer(ctx context.Context, projectName, projectPa
 
 	logs.Debugf("wtf?")
 	return nil
+}
+
+// RunCommandInContainer attaches to a non-TTY container, starts it, streams
+// stdout/stderr to the host's stdout/stderr, waits for it to finish, removes
+// it, and returns the exit code.
+func (dc *DockerClient) RunCommandInContainer(ctx context.Context, containerID string) (exitCode int, err error) {
+	attach, err := dc.client.ContainerAttach(ctx, containerID, container.AttachOptions{
+		Stream: true,
+		Stdin:  false,
+		Stdout: true,
+		Stderr: true,
+		Logs:   false,
+	})
+	if err != nil {
+		return 0, err
+	}
+	defer attach.Close()
+
+	if err = dc.client.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
+		return 0, err
+	}
+
+	// Non-TTY output is multiplexed by the Docker daemon; stdcopy demuxes it.
+	copyDone := make(chan error, 1)
+	go func() {
+		_, e := stdcopy.StdCopy(os.Stdout, os.Stderr, attach.Reader)
+		copyDone <- e
+	}()
+
+	statusCh, errCh := dc.client.ContainerWait(ctx, containerID, container.WaitConditionNotRunning)
+
+	select {
+	case <-ctx.Done():
+		attach.Close()
+		_ = dc.client.ContainerRemove(context.Background(), containerID, container.RemoveOptions{Force: true})
+		return 0, ctx.Err()
+
+	case waitErr := <-errCh:
+		attach.Close()
+		_ = dc.client.ContainerRemove(context.Background(), containerID, container.RemoveOptions{Force: true})
+		if waitErr != nil {
+			return 0, fmt.Errorf("container wait: %w", waitErr)
+		}
+		return 0, nil
+
+	case st := <-statusCh:
+		<-copyDone // drain streamed output before returning
+		_ = dc.client.ContainerRemove(context.Background(), containerID, container.RemoveOptions{Force: true})
+		return int(st.StatusCode), nil
+	}
 }
 
 func (dc *DockerClient) KillContainer(containerID string) error {

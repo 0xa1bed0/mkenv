@@ -277,3 +277,101 @@ func TestFindFileRespectsIgnoreAndSorts(t *testing.T) {
 		t.Fatalf("FindFile returned %v, want %v", got, want)
 	}
 }
+
+func TestFindFileIgnoresDeepNodeModules(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	pathOps := fsopsMocks.NewMockPathOps(ctrl)
+	osOps := fsopsMocks.NewMockOSOps(ctrl)
+	walker := fsopsMocks.NewMockDirWalker(ctrl)
+
+	const rootInput = "root"
+	const absRoot = "/abs/root"
+
+	pathOps.EXPECT().Abs(rootInput).Return(absRoot, nil)
+	osOps.EXPECT().Stat(absRoot).Return(fakeFileInfo{name: absRoot, isDir: true}, nil)
+	pathOps.EXPECT().Clean(absRoot).Return(absRoot)
+
+	pathOps.EXPECT().Clean(gomock.Any()).DoAndReturn(func(p string) string {
+		return filepath.Clean(p)
+	}).AnyTimes()
+	pathOps.EXPECT().IsAbs(gomock.Any()).DoAndReturn(func(p string) bool {
+		return filepath.IsAbs(p)
+	}).AnyTimes()
+	pathOps.EXPECT().Join(gomock.Any(), gomock.Any()).DoAndReturn(func(parts ...string) string {
+		return filepath.Join(parts...)
+	}).AnyTimes()
+	pathOps.EXPECT().Rel(gomock.Any(), gomock.Any()).DoAndReturn(func(a, b string) (string, error) {
+		return filepath.Rel(a, b)
+	}).AnyTimes()
+
+	walker.EXPECT().WalkDir(absRoot, gomock.Any()).DoAndReturn(func(root string, fn fs.WalkDirFunc) error {
+		type entry struct {
+			path string
+			dir  bool
+		}
+		entries := []entry{
+			{path: absRoot, dir: true},
+			// Root-level go.mod (should be found)
+			{path: filepath.Join(absRoot, "go.mod"), dir: false},
+			// Root node_modules (should be skipped)
+			{path: filepath.Join(absRoot, "node_modules"), dir: true},
+			{path: filepath.Join(absRoot, "node_modules", "pkg", "go.mod"), dir: false},
+			// Deep node_modules (should also be skipped)
+			{path: filepath.Join(absRoot, "src"), dir: true},
+			{path: filepath.Join(absRoot, "src", "infra"), dir: true},
+			{path: filepath.Join(absRoot, "src", "infra", "node_modules"), dir: true},
+			{path: filepath.Join(absRoot, "src", "infra", "node_modules", "pkg", "go.mod"), dir: false},
+			// Sub-project go.mod (should be found)
+			{path: filepath.Join(absRoot, "src", "infra", "go.mod"), dir: false},
+		}
+
+		skipped := map[string]struct{}{}
+
+		for _, e := range entries {
+			skip := false
+			for prefix := range skipped {
+				if strings.HasPrefix(e.path, prefix) {
+					skip = true
+					break
+				}
+			}
+			if skip {
+				continue
+			}
+
+			entry := fakeDirEntry{name: filepath.Base(e.path), isDir: e.dir}
+			err := fn(e.path, entry, nil)
+			if err == fs.SkipDir {
+				skipped[e.path+string(filepath.Separator)] = struct{}{}
+				continue
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	fmIface, err := NewFileManagerWithOps(rootInput, fsops.Ops{Path: pathOps, OS: osOps, Walker: walker})
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+
+	got, err := fmIface.FindFile("go.mod", []string{"node_modules"})
+	if err != nil {
+		t.Fatalf("FindFile failed: %v", err)
+	}
+
+	want := []string{
+		"go.mod",
+		"src/infra/go.mod",
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("FindFile returned %v, want %v (deep node_modules should be ignored)", got, want)
+	}
+}

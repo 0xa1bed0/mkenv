@@ -34,40 +34,48 @@ type ContainerOrchestrator struct {
 	forwarderRegistry *host.ForwarderRegistry
 	exitCh            chan OrchestratorExitSignal
 
-	binds []string
+	binds    []string
+	groupAdd []string
+	command  string
 
 	once sync.Once
 }
 
-func NewContainerOrchestrator(rt *runtime.Runtime, binds []string, dockerClient *dockerclient.DockerClient, exitCh chan OrchestratorExitSignal) (*ContainerOrchestrator, error) {
-	controlAPI, err := host.StartControlPlane(rt)
-	if err != nil {
-		return nil, err
+func NewContainerOrchestrator(rt *runtime.Runtime, binds, groupAdd []string, dockerClient *dockerclient.DockerClient, exitCh chan OrchestratorExitSignal, command string) (*ContainerOrchestrator, error) {
+	co := &ContainerOrchestrator{
+		rt:           rt,
+		dockerClient: dockerClient,
+		exitCh:       exitCh,
+		binds:        binds,
+		groupAdd:     groupAdd,
+		command:      command,
 	}
 
-	// Load policy for reverse proxy configuration
-	policy, err := guardrails.LoadPolicy()
-	if err != nil {
-		return nil, fmt.Errorf("load policy: %w", err)
+	// Control plane and reverse proxy are only needed for interactive mode.
+	if command == "" {
+		controlAPI, err := host.StartControlPlane(rt)
+		if err != nil {
+			return nil, err
+		}
+
+		// Load policy for reverse proxy configuration
+		policy, err := guardrails.LoadPolicy()
+		if err != nil {
+			return nil, fmt.Errorf("load policy: %w", err)
+		}
+
+		// Start reverse proxy server on random port
+		reverseProxy, err := host.StartReverseProxyServer(rt, policy)
+		if err != nil {
+			return nil, fmt.Errorf("start reverse proxy: %w", err)
+		}
+
+		co.controlAPI = controlAPI
+		co.reverseProxy = reverseProxy
+		co.forwarderRegistry = host.NewForwarderRegistry(rt)
 	}
 
-	// Start reverse proxy server on random port
-	reverseProxy, err := host.StartReverseProxyServer(rt, policy)
-	if err != nil {
-		return nil, fmt.Errorf("start reverse proxy: %w", err)
-	}
-
-	forwarderRegistry := host.NewForwarderRegistry(rt)
-
-	return &ContainerOrchestrator{
-		rt:                rt,
-		dockerClient:      dockerClient,
-		controlAPI:        controlAPI,
-		reverseProxy:      reverseProxy,
-		forwarderRegistry: forwarderRegistry,
-		exitCh:            exitCh,
-		binds:             binds,
-	}, nil
+	return co, nil
 }
 
 func (co *ContainerOrchestrator) Start() error {
@@ -90,6 +98,11 @@ func (co *ContainerOrchestrator) Start() error {
 }
 
 func (co *ContainerOrchestrator) startEnv() {
+	if co.command != "" {
+		co.startCommandEnv()
+		return
+	}
+
 	co.once.Do(func() {
 		co.controlAPI.ServerProtocol.Handle(co.onPortSnapshot())
 		co.controlAPI.ServerProtocol.Handle(co.onExpose())
@@ -106,7 +119,7 @@ func (co *ContainerOrchestrator) startEnv() {
 	// Build environment variables including reverse proxy address
 	envs := co.getEnvVars()
 
-	containerID, containerPortRessservation, err := co.dockerClient.CreateContainer(containerCtx, co.rt.Project(), co.rt.Container().ImageTag(), envs, co.binds)
+	containerID, containerPortRessservation, err := co.dockerClient.CreateContainer(containerCtx, co.rt.Project(), co.rt.Container().ImageTag(), envs, co.binds, co.groupAdd)
 	if err != nil {
 		co.exitCh <- OrchestratorExitSignal{Err: err}
 		return
@@ -135,6 +148,35 @@ func (co *ContainerOrchestrator) startEnv() {
 	case <-containerCtx.Done():
 		logs.Infof("container killed from outside")
 	}
+}
+
+func (co *ContainerOrchestrator) startCommandEnv() {
+	ctx := co.rt.Ctx()
+
+	// Only pass host timezone — no control-plane or proxy env vars needed.
+	var envs []string
+	if tz := hostTimezone(); tz != "" {
+		envs = append(envs, "TZ="+tz)
+	}
+
+	containerID, err := co.dockerClient.CreateCommandContainer(ctx, co.rt.Project(), co.rt.Container().ImageTag(), envs, co.binds, co.groupAdd, co.command)
+	if err != nil {
+		co.exitCh <- OrchestratorExitSignal{Err: err}
+		return
+	}
+
+	exitCode, err := co.dockerClient.RunCommandInContainer(ctx, containerID)
+	if err != nil {
+		co.exitCh <- OrchestratorExitSignal{Err: err}
+		return
+	}
+
+	if exitCode != 0 {
+		co.exitCh <- OrchestratorExitSignal{Err: runtime.ExitCodeError{Code: exitCode}}
+		return
+	}
+
+	co.exitCh <- OrchestratorExitSignal{}
 }
 
 // getEnvVars builds the complete set of environment variables for the container,

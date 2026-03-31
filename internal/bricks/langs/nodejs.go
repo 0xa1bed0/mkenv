@@ -3,7 +3,6 @@ package langs
 import (
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/filesmanager"
-	"github.com/0xa1bed0/mkenv/internal/versions"
 )
 
 const (
@@ -96,51 +95,33 @@ func (*nodejsDetector) BrickInfo() *bricksengine.BrickInfo {
 }
 
 func (nd *nodejsDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine.BrickID, map[string]string, error) {
-	// Check package.json for version
-	pkgFound, pkgMeta, err := nd.packageJsonDetector.ScanFiles(folderPtr)
-	if err != nil {
-		return "", nil, err
-	}
-
-	// Check .npmrc for version
+	// Priority: check .npmrc first
 	npmrcFound, npmrcMeta, err := nd.npmrcDetector.ScanFiles(folderPtr)
 	if err != nil {
 		return "", nil, err
 	}
 
-	// Not a nodejs project
-	if !pkgFound && !npmrcFound {
-		return "", nil, nil
-	}
-
-	// Combine versions from both sources
-	pkgVersion := ""
-	if pkgMeta != nil {
-		pkgVersion = pkgMeta["version"]
-	}
 	npmrcVersion := ""
 	if npmrcMeta != nil {
 		npmrcVersion = npmrcMeta["version"]
 	}
 
-	// Determine final version
-	var finalMeta map[string]string
-	if pkgVersion != "" && npmrcVersion != "" {
-		// Both have versions - compare and use maximum
-		maxVersion, err := versions.MaxVersion([]string{pkgVersion, npmrcVersion})
-		if err == nil {
-			finalMeta = map[string]string{"version": maxVersion}
-		} else {
-			// On error, prefer package.json version
-			finalMeta = map[string]string{"version": pkgVersion}
-		}
-	} else if pkgVersion != "" {
-		finalMeta = map[string]string{"version": pkgVersion}
-	} else if npmrcVersion != "" {
-		finalMeta = map[string]string{"version": npmrcVersion}
+	// If .npmrc has a version, use it — skip package.json scanning
+	if npmrcVersion != "" {
+		return nodejsID, npmrcMeta, nil
 	}
 
-	return nodejsID, finalMeta, nil
+	// Fallback: check package.json
+	pkgFound, pkgMeta, err := nd.packageJsonDetector.ScanFiles(folderPtr)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if !pkgFound && !npmrcFound {
+		return "", nil, nil
+	}
+
+	return nodejsID, pkgMeta, nil
 }
 
 func init() {

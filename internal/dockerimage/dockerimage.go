@@ -38,10 +38,10 @@ func DefaultDockerImageResolver(ctx context.Context) (*DockerImageResolver, erro
 	return defaultDockerImageResolver, nil
 }
 
-func (dib *DockerImageResolver) ResolveImageID(ctx context.Context, project *runtime.Project, forceRebuild bool) (ImageID, error) {
+func (dib *DockerImageResolver) ResolveImageID(ctx context.Context, project *runtime.Project, forceRebuild bool, imageMaxAge time.Duration) (ImageID, error) {
 	for {
 		logs.Debugf("try to resolve image for project: %s", project.Path())
-		idByRunConfig, found, runConfigCacheKey := dib.imageCache.GetByProject(ctx, project)
+		idByRunConfig, found, runConfigCacheKey := dib.imageCache.GetByProject(ctx, project, imageMaxAge)
 		logs.Debugf("project cache lookup: key=%s, found=%v, imageID=%s", runConfigCacheKey, found, idByRunConfig)
 		// we need to set new imaghe to the cache, so we preserve cache key and override result
 		// TODO: maybe we don't need to read db in this case - just get cache key and that's it
@@ -83,7 +83,8 @@ func (dib *DockerImageResolver) ResolveImageID(ctx context.Context, project *run
 
 		logs.Debugf("generating dockerfile...")
 		df := plan.GenerateDockerfile()
-		idByDockerfile, found, dockerfileCacheKey := dib.imageCache.GetByDockerfile(ctx, df)
+		logs.Debugf("generated dockerfile:\n%s", df.String())
+		idByDockerfile, found, dockerfileCacheKey := dib.imageCache.GetByDockerfile(ctx, df, imageMaxAge)
 		logs.Debugf("dockerfile cache lookup: key=%s, found=%v, imageID=%s", dockerfileCacheKey, found, idByDockerfile)
 		if forceRebuild {
 			logs.Debugf("forceRebuild=true, ignoring dockerfile cache")
