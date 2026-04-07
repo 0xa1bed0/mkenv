@@ -331,13 +331,14 @@ func (co *ContainerOrchestrator) onInstallRequest() (string, protocol.ControlCom
 		}
 
 		var response strings.Builder
-		cmds := pkgManager.Install([]bricksengine.PackageSpec{{Name: request.PkgName}})
+		cmds := pkgManager.RuntimeInstall([]bricksengine.PackageSpec{{Name: request.PkgName}})
 		for _, cmd := range cmds {
+			cmdLine := strings.Join(cmd.Argv, " ")
 			resp, err := co.dockerClient.ExecAsRoot(ctx, co.rt.Container().ContainerID(), cmd.Argv)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("running %q: %w\noutput:\n%s", cmdLine, err, resp)
 			}
-			response.WriteString("running: " + strings.Join(cmd.Argv, " ") + "\n\n" + resp + "\n\n")
+			response.WriteString("running: " + cmdLine + "\n\n" + resp + "\n\n")
 		}
 
 		return &shared.OnInstallResponse{Logs: response.String()}, nil

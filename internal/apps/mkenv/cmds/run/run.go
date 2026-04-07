@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/0xa1bed0/mkenv/internal/agentdist"
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
 	sandboxappconfig "github.com/0xa1bed0/mkenv/internal/apps/sandbox/config"
+	"github.com/0xa1bed0/mkenv/internal/bricks/tools"
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/dockerclient"
 	"github.com/0xa1bed0/mkenv/internal/dockercontainer"
@@ -34,6 +37,7 @@ type runOptions struct {
 	ForceRebuild    bool
 	CleanCache      bool
 	AddDockerSocket bool
+	MountGPG        bool
 	Command         string
 }
 
@@ -51,6 +55,7 @@ func AttachRunCmdFlags(cmd *cobra.Command) {
 	flags.StringSliceVar(&opts.Volumes, "volume", nil, "Bind mount in 'host:container' format (may be repeated)")
 	flags.BoolVar(&opts.ForceRebuild, "rebuild", false, "Force rebuild of the dev image. Update image cache for the next runs")
 	flags.BoolVar(&opts.AddDockerSocket, "add-docker-socket-i-know-what-i-do", false, "Mount the host Docker socket into the container and install Docker CLI")
+	flags.BoolVar(&opts.MountGPG, "mount-gpg", false, "Mount host GPG agent sockets into the container (for YubiKey/smartcard SSH)")
 	flags.StringVarP(&opts.Command, "command", "c", "", "Run a single command inside the environment and exit (non-interactive)")
 
 	// Store opts in command context before running
@@ -76,6 +81,10 @@ func (ro *runOptions) EnvConfig() runtime.EnvConfig {
 
 	if ro.AddDockerSocket {
 		enableBricks = append(enableBricks, "docker-cli")
+	}
+
+	if ro.MountGPG {
+		enableBricks = append(enableBricks, "gpg-agent")
 	}
 
 	cliRunConfig := runtime.BuildEnvConfig(
@@ -168,7 +177,7 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 
 	rt.Container().SetImageTag(string(imageID))
 
-	binds, groupAdd, err := mkbinds(signalsCtx, rt, project, opts.AddDockerSocket)
+	binds, groupAdd, err := mkbinds(signalsCtx, rt, project, opts.AddDockerSocket, opts.MountGPG)
 	if err != nil {
 		return err
 	}
@@ -189,7 +198,7 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 	return containerOrchestrator.Start()
 }
 
-func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project, addDockerSocket bool) ([]string, []string, error) {
+func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project, addDockerSocket bool, mountGPG bool) ([]string, []string, error) {
 	binds, err := ResolveBinds(project.EnvConfig(ctx).Volumes())
 	if err != nil {
 		return nil, nil, err
@@ -239,6 +248,35 @@ func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project,
 		}
 	}
 
+	if mountGPG {
+		gpgSocketPath, err := detectGPGAgentSocketPath(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("GPG agent socket not found: %w\nEnsure gpg-agent is running (gpgconf --launch gpg-agent)", err)
+		}
+		binds = append(binds, gpgSocketPath+":"+tools.GPGAgentSocketDir+"/S.gpg-agent")
+
+		// Detect the socket's owning GID so the container user can access it.
+		fi, err := os.Stat(gpgSocketPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("stat GPG agent socket: %w", err)
+		}
+		if st, ok := fi.Sys().(*syscall.Stat_t); ok {
+			gid := fmt.Sprintf("%d", st.Gid)
+			if gid == "0" {
+				groupAdd = appendUnique(groupAdd, "0")
+			} else {
+				groupAdd = appendUnique(groupAdd, "0", gid)
+			}
+		}
+
+		sshSocketPath, err := detectGPGSSHSocketPath(ctx)
+		if err != nil {
+			logs.Warnf("GPG SSH socket not found, SSH via GPG agent will not work: %v", err)
+		} else {
+			binds = append(binds, sshSocketPath+":"+tools.GPGAgentSocketDir+"/S.gpg-agent.ssh")
+		}
+	}
+
 	return binds, groupAdd, nil
 }
 
@@ -277,4 +315,88 @@ func getRunOptions(ctx context.Context) *runOptions {
 		return nil
 	}
 	return v.(*runOptions)
+}
+
+func detectGPGAgentSocketPath(ctx context.Context) (string, error) {
+	// Prefer the main socket — the extra socket restricts pinentry behavior
+	// (e.g. broken input, missing key icon) which breaks interactive PIN entry.
+	for _, dir := range []string{"agent-socket", "agent-extra-socket"} {
+		if p := gpgconfListDir(ctx, dir); p != "" {
+			return p, nil
+		}
+	}
+
+	// Fallback to well-known paths.
+	home, _ := os.UserHomeDir()
+	gnupgHome := os.Getenv("GNUPGHOME")
+	if gnupgHome == "" && home != "" {
+		gnupgHome = filepath.Join(home, ".gnupg")
+	}
+	if gnupgHome != "" {
+		for _, name := range []string{"S.gpg-agent", "S.gpg-agent.extra"} {
+			p := filepath.Join(gnupgHome, name)
+			if _, err := os.Stat(p); err == nil {
+				return p, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("could not detect GPG agent socket: ensure gpg-agent is running")
+}
+
+func detectGPGSSHSocketPath(ctx context.Context) (string, error) {
+	if p := gpgconfListDir(ctx, "agent-ssh-socket"); p != "" {
+		return p, nil
+	}
+
+	home, _ := os.UserHomeDir()
+	gnupgHome := os.Getenv("GNUPGHOME")
+	if gnupgHome == "" && home != "" {
+		gnupgHome = filepath.Join(home, ".gnupg")
+	}
+	if gnupgHome != "" {
+		p := filepath.Join(gnupgHome, "S.gpg-agent.ssh")
+		if _, err := os.Stat(p); err == nil {
+			return p, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not detect GPG SSH socket")
+}
+
+// appendUnique appends values to a slice, skipping duplicates.
+func appendUnique(slice []string, vals ...string) []string {
+	for _, v := range vals {
+		found := false
+		for _, s := range slice {
+			if s == v {
+				found = true
+				break
+			}
+		}
+		if !found {
+			slice = append(slice, v)
+		}
+	}
+	return slice
+}
+
+// gpgconfListDir runs "gpgconf --list-dirs <key>" and returns the trimmed
+// output if the resulting path exists on disk.
+func gpgconfListDir(ctx context.Context, key string) string {
+	cmdCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(cmdCtx, "gpgconf", "--list-dirs", key).Output()
+	if err != nil {
+		return ""
+	}
+	p := strings.TrimSpace(string(out))
+	if p == "" {
+		return ""
+	}
+	if _, err := os.Stat(p); err != nil {
+		return ""
+	}
+	return p
 }
