@@ -12,6 +12,6 @@ package version
 // Don't bump for:
 //   - CLI-only changes
 //   - Bug fixes not affecting image content
-const ImageSchemaVersion = 1
+const ImageSchemaVersion = 3
 
 const ImageSchemaVersionLabel = "mkenv.image_schema_version"

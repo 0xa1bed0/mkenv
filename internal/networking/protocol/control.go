@@ -52,12 +52,18 @@ func PackControlSignalEnvelope[T any](id, typ string, v T) (ControlSignalEnvelop
 
 // UnpackControlSignalEnvelope decodes Envelope.Data into out.
 func UnpackControlSignalEnvelope[T any](env ControlSignalEnvelope, out *T) error {
+	if env.Err != "" {
+		return fmt.Errorf("remote error (type=%s, id=%s): %s", env.Type, env.ID, env.Err)
+	}
 	if len(env.Data) == 0 {
-		return errors.New("empty data")
+		return fmt.Errorf("empty data in envelope (type=%s, id=%s, ok=%v)", env.Type, env.ID, env.OK)
 	}
 	dec := json.NewDecoder(bytes.NewReader(env.Data))
 	dec.DisallowUnknownFields()
-	return dec.Decode(out)
+	if err := dec.Decode(out); err != nil {
+		return fmt.Errorf("decode error (type=%s, id=%s): %w", env.Type, env.ID, err)
+	}
+	return nil
 }
 
 func NewID() string {
@@ -389,9 +395,21 @@ func (s *ControlServerProtocol) dispatch(c *ControlConn, env ControlSignalEnvelo
 			OK:   false,
 			Err:  err.Error(),
 		})
+		return
 	}
 
 	responseEnvelope, err := PackControlSignalEnvelope(env.ID, env.Type+".resp", response)
+	if err != nil {
+		logs.Errorf("dispatch: failed to pack response for %s (id=%s): %v", env.Type, env.ID, err)
+		_ = c.Send(ControlSignalEnvelope{
+			ID:   env.ID,
+			Type: env.Type + ".resp",
+			OK:   false,
+			Err:  fmt.Sprintf("internal: failed to pack response: %v", err),
+		})
+		return
+	}
+	responseEnvelope.OK = true
 	_ = c.Send(responseEnvelope)
 }
 

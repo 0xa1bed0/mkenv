@@ -1,50 +1,30 @@
 package tools
 
 import (
-	"fmt"
-
-	"github.com/0xa1bed0/mkenv/internal/bricks/langs"
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 )
 
 const claudeCode = "claude-code"
 
 func NewClaudeCode(metadata map[string]string) (bricksengine.Brick, error) {
-	if metadata == nil {
-		metadata = make(map[string]string)
-	}
-
-	packageSpec := "@anthropic-ai/claude-code"
-	if version, ok := metadata["version"]; ok && version != "" {
-		packageSpec = fmt.Sprintf("%s@%s", packageSpec, version)
-	}
-
-	nodeMeta := map[string]string{}
-	if nodeVersion, ok := metadata["node_version"]; ok && nodeVersion != "" {
-		nodeMeta["version"] = nodeVersion
-	}
-	if len(nodeMeta) == 0 {
-		nodeMeta = nil
-	}
-
-	nodeBrick, err := langs.NewNodejs(nodeMeta)
-	if err != nil {
-		return nil, err
-	}
-
 	brick, err := bricksengine.NewBrick(claudeCode, "Claude Code CLI",
 		bricksengine.WithKind(bricksengine.BrickKindCommon),
-		bricksengine.WithBrick(nodeBrick),
-		bricksengine.WithCacheFolder("${MKENV_HOME}/.npm"),
+		bricksengine.WithPackageRequest(bricksengine.PackageRequest{
+			Reason: "claude-code install dependencies",
+			Packages: []bricksengine.PackageSpec{
+				{Name: "ca-certificates"},
+				{Name: "curl"},
+			},
+		}),
 		bricksengine.WithCacheFolder("${MKENV_HOME}/.claude"),
 		bricksengine.WithCacheFile("${MKENV_HOME}/.claude.json"),
 		bricksengine.WithUserRun(bricksengine.Command{
 			When: "build",
-			Argv: []string{"/bin/bash", "-lc", fmt.Sprintf(`set -eo pipefail
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-nvm use default >/dev/null
-npm install -g %s
-ln -sf "$(npm bin -g)/claude" "${MKENV_LOCAL_BIN}/claude"`, packageSpec)},
+			Argv: []string{"bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash"},
+		}),
+		bricksengine.WithUserRun(bricksengine.Command{
+			When: "build",
+			Argv: []string{"ln", "-sf", "${MKENV_HOME}/.local/bin/claude", "${MKENV_LOCAL_BIN}/claude"},
 		}),
 	)
 	if err != nil {

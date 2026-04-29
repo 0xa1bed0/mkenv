@@ -16,6 +16,12 @@ cd ~/projects/myapp && mkenv .
 
 Your `npm install`, `pip install`, LLM agents, and builds run isolated. Your credentials stay on your host.
 
+Run a single command inside the environment and exit — useful for CI, git hooks, and one-off builds:
+
+```sh
+mkenv . -c "make precommit"
+```
+
 ## Install
 
 **Prerequisites:** Docker Desktop or Docker Engine
@@ -46,6 +52,7 @@ sudo mv mkenv /usr/local/bin/
 - **Blocked sensitive paths** — Can't mount `~/.ssh`, `~/.aws`, `~/.docker`, browser profiles, password managers
 - **Pre-flight secret scan** — Scans your project for `.env` files, API keys, private keys before starting
 - **Network audit** — All traffic logged locally. System-critical ports blocked by default
+- **GPG agent forwarding** — Use YubiKey/smartcard for SSH, signing, and encryption/decryption inside the container with `--mount-gpg`. Public keyring is imported automatically, PIN prompts render cleanly on the host
 - **Policy engine** — Protects devs from accidental mistakes. Teams can enforce their own rules
 
 ### Hardened by default

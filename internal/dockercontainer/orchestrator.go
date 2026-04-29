@@ -12,6 +12,7 @@ import (
 
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
 	"github.com/0xa1bed0/mkenv/internal/bricks/systems"
+	"github.com/0xa1bed0/mkenv/internal/bricks/tools"
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/dockerclient"
 	"github.com/0xa1bed0/mkenv/internal/guardrails"
@@ -32,42 +33,89 @@ type ContainerOrchestrator struct {
 	controlAPI        *host.ControlListener
 	reverseProxy      *host.ReverseProxyServer
 	forwarderRegistry *host.ForwarderRegistry
+	gpgProxy          *host.GPGSocketProxy
 	exitCh            chan OrchestratorExitSignal
 
-	binds []string
+	binds    []string
+	groupAdd []string
+	command  string
+
+	gpgAgentSocketPath string
+	gpgSSHSocketPath   string
 
 	once sync.Once
 }
 
-func NewContainerOrchestrator(rt *runtime.Runtime, binds []string, dockerClient *dockerclient.DockerClient, exitCh chan OrchestratorExitSignal) (*ContainerOrchestrator, error) {
-	controlAPI, err := host.StartControlPlane(rt)
-	if err != nil {
-		return nil, err
+func NewContainerOrchestrator(rt *runtime.Runtime, binds, groupAdd []string, dockerClient *dockerclient.DockerClient, exitCh chan OrchestratorExitSignal, command string, gpgAgentSocketPath, gpgSSHSocketPath string) (*ContainerOrchestrator, error) {
+	co := &ContainerOrchestrator{
+		rt:                 rt,
+		dockerClient:       dockerClient,
+		exitCh:             exitCh,
+		binds:              binds,
+		groupAdd:           groupAdd,
+		command:            command,
+		gpgAgentSocketPath: gpgAgentSocketPath,
+		gpgSSHSocketPath:   gpgSSHSocketPath,
 	}
 
-	// Load policy for reverse proxy configuration
-	policy, err := guardrails.LoadPolicy()
-	if err != nil {
-		return nil, fmt.Errorf("load policy: %w", err)
+	// Control plane and reverse proxy are only needed for interactive mode.
+	if command == "" {
+		controlAPI, err := host.StartControlPlane(rt)
+		if err != nil {
+			return nil, err
+		}
+
+		// Load policy for reverse proxy configuration
+		policy, err := guardrails.LoadPolicy()
+		if err != nil {
+			return nil, fmt.Errorf("load policy: %w", err)
+		}
+
+		// Start reverse proxy server on random port
+		reverseProxy, err := host.StartReverseProxyServer(rt, policy)
+		if err != nil {
+			return nil, fmt.Errorf("start reverse proxy: %w", err)
+		}
+
+		co.controlAPI = controlAPI
+		co.reverseProxy = reverseProxy
+		co.forwarderRegistry = host.NewForwarderRegistry(rt)
+
+		// Start GPG socket proxy if GPG forwarding was requested.
+		if gpgAgentSocketPath != "" || gpgSSHSocketPath != "" {
+			// Tell the host gpg-agent to use our current TTY for pinentry.
+			// Without this, pinentry may be attached to a different terminal
+			// session (e.g. the one where the agent was originally started).
+			host.UpdateGPGStartupTTY()
+
+			// Use /tmp as base dir — Unix socket paths have a 104-byte limit on macOS,
+			// so longer paths like ~/.config/mkenv/projects/... would fail.
+			// /tmp is shared with Docker Desktop's VM by default.
+			gpgProxy, err := host.StartGPGProxy(rt, rt.Term(), gpgAgentSocketPath, gpgSSHSocketPath, "/tmp")
+			if err != nil {
+				return nil, fmt.Errorf("start GPG proxy: %w", err)
+			}
+			co.gpgProxy = gpgProxy
+
+			proxyDir := gpgProxy.ProxyDir()
+			if gpgAgentSocketPath != "" {
+				co.binds = append(co.binds, proxyDir+"/S.gpg-agent:"+tools.GPGAgentSocketDir+"/S.gpg-agent")
+			}
+			if gpgSSHSocketPath != "" {
+				co.binds = append(co.binds, proxyDir+"/S.gpg-agent.ssh:"+tools.GPGAgentSocketDir+"/S.gpg-agent.ssh")
+			}
+		}
+	} else {
+		// Non-interactive mode: direct bind mounts (no raw mode, no proxy needed).
+		if gpgAgentSocketPath != "" {
+			co.binds = append(co.binds, gpgAgentSocketPath+":"+tools.GPGAgentSocketDir+"/S.gpg-agent")
+		}
+		if gpgSSHSocketPath != "" {
+			co.binds = append(co.binds, gpgSSHSocketPath+":"+tools.GPGAgentSocketDir+"/S.gpg-agent.ssh")
+		}
 	}
 
-	// Start reverse proxy server on random port
-	reverseProxy, err := host.StartReverseProxyServer(rt, policy)
-	if err != nil {
-		return nil, fmt.Errorf("start reverse proxy: %w", err)
-	}
-
-	forwarderRegistry := host.NewForwarderRegistry(rt)
-
-	return &ContainerOrchestrator{
-		rt:                rt,
-		dockerClient:      dockerClient,
-		controlAPI:        controlAPI,
-		reverseProxy:      reverseProxy,
-		forwarderRegistry: forwarderRegistry,
-		exitCh:            exitCh,
-		binds:             binds,
-	}, nil
+	return co, nil
 }
 
 func (co *ContainerOrchestrator) Start() error {
@@ -90,6 +138,11 @@ func (co *ContainerOrchestrator) Start() error {
 }
 
 func (co *ContainerOrchestrator) startEnv() {
+	if co.command != "" {
+		co.startCommandEnv()
+		return
+	}
+
 	co.once.Do(func() {
 		co.controlAPI.ServerProtocol.Handle(co.onPortSnapshot())
 		co.controlAPI.ServerProtocol.Handle(co.onExpose())
@@ -106,18 +159,18 @@ func (co *ContainerOrchestrator) startEnv() {
 	// Build environment variables including reverse proxy address
 	envs := co.getEnvVars()
 
-	containerID, containerPortRessservation, err := co.dockerClient.CreateContainer(containerCtx, co.rt.Project(), co.rt.Container().ImageTag(), envs, co.binds)
+	containerID, containerPortReservation, err := co.dockerClient.CreateContainer(containerCtx, co.rt.Project(), co.rt.Container().ImageTag(), envs, co.binds, co.groupAdd)
 	if err != nil {
 		co.exitCh <- OrchestratorExitSignal{Err: err}
 		return
 	}
 
 	co.rt.Container().SetContainerID(containerID)
-	co.rt.Container().SetPort(containerPortRessservation.Port)
+	co.rt.Container().SetPort(containerPortReservation.Port)
 
 	errChan := make(chan error, 1)
 	co.rt.GoNamed("RunContainer", func() {
-		err := co.dockerClient.RunContainer(containerCtx, co.rt.Project().Name(), co.rt.Project().Path(), containerID, containerPortRessservation.Claim, co.rt.Term())
+		err := co.dockerClient.RunContainer(containerCtx, co.rt.Project().Name(), co.rt.Project().Path(), containerID, containerPortReservation.Claim, co.rt.Term())
 		errChan <- err
 	})
 
@@ -135,6 +188,35 @@ func (co *ContainerOrchestrator) startEnv() {
 	case <-containerCtx.Done():
 		logs.Infof("container killed from outside")
 	}
+}
+
+func (co *ContainerOrchestrator) startCommandEnv() {
+	ctx := co.rt.Ctx()
+
+	// Only pass host timezone — no control-plane or proxy env vars needed.
+	var envs []string
+	if tz := hostTimezone(); tz != "" {
+		envs = append(envs, "TZ="+tz)
+	}
+
+	containerID, err := co.dockerClient.CreateCommandContainer(ctx, co.rt.Project(), co.rt.Container().ImageTag(), envs, co.binds, co.groupAdd, co.command)
+	if err != nil {
+		co.exitCh <- OrchestratorExitSignal{Err: err}
+		return
+	}
+
+	exitCode, err := co.dockerClient.RunCommandInContainer(ctx, containerID)
+	if err != nil {
+		co.exitCh <- OrchestratorExitSignal{Err: err}
+		return
+	}
+
+	if exitCode != 0 {
+		co.exitCh <- OrchestratorExitSignal{Err: runtime.ExitCodeError{Code: exitCode}}
+		return
+	}
+
+	co.exitCh <- OrchestratorExitSignal{}
 }
 
 // getEnvVars builds the complete set of environment variables for the container,
@@ -289,13 +371,14 @@ func (co *ContainerOrchestrator) onInstallRequest() (string, protocol.ControlCom
 		}
 
 		var response strings.Builder
-		cmds := pkgManager.Install([]bricksengine.PackageSpec{{Name: request.PkgName}})
+		cmds := pkgManager.RuntimeInstall([]bricksengine.PackageSpec{{Name: request.PkgName}})
 		for _, cmd := range cmds {
+			cmdLine := strings.Join(cmd.Argv, " ")
 			resp, err := co.dockerClient.ExecAsRoot(ctx, co.rt.Container().ContainerID(), cmd.Argv)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("running %q: %w\noutput:\n%s", cmdLine, err, resp)
 			}
-			response.WriteString("running: " + strings.Join(cmd.Argv, " ") + "\n\n" + resp + "\n\n")
+			response.WriteString("running: " + cmdLine + "\n\n" + resp + "\n\n")
 		}
 
 		return &shared.OnInstallResponse{Logs: response.String()}, nil

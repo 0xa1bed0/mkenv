@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -60,7 +61,7 @@ func (plan *BuildPlan) expandPackages() {
 
 	steps := mgr.Install(plan.packages)
 	if len(steps) > 0 {
-		plan.rootRun = append(plan.rootRun, steps...)
+		plan.rootRun = append(steps, plan.rootRun...)
 	}
 }
 
@@ -167,6 +168,7 @@ func (p *planner) buildPlan(ctx context.Context) (*BuildPlan, error) {
 			"MKENV_GID":       sandboxappconfig.UserGID,
 			"MKENV_HOME":      sandboxappconfig.HomeFolder,
 			"MKENV_LOCAL_BIN": sandboxappconfig.UserLocalBin,
+			"MKENV_WORKDIR":   "/" + filepath.Base(p.project.Path()),
 		},
 		order: []bricksengine.BrickID{},
 	}

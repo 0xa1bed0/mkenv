@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xa1bed0/mkenv/internal/bricksengine"
 	"github.com/0xa1bed0/mkenv/internal/filesmanager"
+	"github.com/0xa1bed0/mkenv/internal/versions"
 )
 
 const (
@@ -94,6 +95,13 @@ func (*golangDetector) BrickInfo() *bricksengine.BrickInfo {
 }
 
 func (gd *golangDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine.BrickID, map[string]string, error) {
+	// Priority: try root go.mod directly
+	version, err := scanRootGoMod(folderPtr)
+	if err == nil && version != "" {
+		return golangID, map[string]string{"version": version}, nil
+	}
+
+	// Fallback: scan all go.mod files
 	found, brickMeta, err := gd.langDetector.ScanFiles(folderPtr)
 	if err != nil {
 		return "", nil, err
@@ -102,6 +110,34 @@ func (gd *golangDetector) Scan(folderPtr filesmanager.FileManager) (bricksengine
 		return golangID, brickMeta, nil
 	}
 	return "", nil, nil
+}
+
+func scanRootGoMod(folderPtr filesmanager.FileManager) (string, error) {
+	scanner, err := folderPtr.GetFileScanner("go.mod", 32)
+	if err != nil {
+		return "", err
+	}
+	defer scanner.Close()
+
+	if err := scanner.Find([]byte("go ")); err != nil {
+		return "", err
+	}
+
+	version, err := scanner.ReadWhile(32, bricksengine.IsVersionChar)
+	if err != nil {
+		return "", err
+	}
+
+	v := string(version)
+	if !bricksengine.HasDigit(v) {
+		return "", nil
+	}
+
+	resolved, err := versions.MaxVersionFromConstraints([]string{">=" + v})
+	if err != nil {
+		return "", err
+	}
+	return resolved, nil
 }
 
 func init() {

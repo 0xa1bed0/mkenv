@@ -31,4 +31,7 @@ func (pr PackageRequest) Clone() PackageRequest {
 type PackageManager interface {
 	Name() string
 	Install(pkgs []PackageSpec) []Command
+	// RuntimeInstall returns commands suitable for installing packages in a
+	// running container (no layer-cache concerns, no list cleanup).
+	RuntimeInstall(pkgs []PackageSpec) []Command
 }

@@ -463,6 +463,112 @@ func TestLangDetector_IgnoresGomodDir(t *testing.T) {
 	}
 }
 
+func TestLangDetector_Nodejs_PackageJsonWithNodeExportPath_SkipsInvalidVersion(t *testing.T) {
+	t.Parallel()
+
+	// tslib-style package.json: "node": "./modules/index.js" in exports
+	// should NOT produce version "." — the invalid version should be skipped.
+	fm := newStubFileManager(map[string]string{
+		"node_modules/tslib/package.json": `{
+  "name": "tslib",
+  "version": "2.8.1",
+  "exports": {
+    ".": {
+      "import": {
+        "node": "./modules/index.js",
+        "default": {
+          "types": "./modules/index.d.ts",
+          "default": "./tslib.es6.mjs"
+        }
+      },
+      "default": "./tslib.js"
+    }
+  }
+}`,
+		"package.json": `{
+  "name": "test-project",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}`,
+		"index.js": "console.log('hello');\n",
+	})
+
+	detector := NewLangDetector("nodejs", "package.json", "js,ts,jsx,tsx", `"node": "`)
+	found, meta, err := detector.ScanFiles(fm)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Error("expected found=true")
+	}
+	// Should pick 20.0.0 from root package.json, ignoring "." from tslib exports
+	if meta["version"] != "20.0.0" {
+		t.Errorf("expected version=20.0.0, got %s", meta["version"])
+	}
+}
+
+func TestLangDetector_Nodejs_OnlyInvalidVersions_NoError(t *testing.T) {
+	t.Parallel()
+
+	// If the only package.json files have "node" in exports (not engines),
+	// the detector should not crash — it should gracefully have no version.
+	fm := newStubFileManager(map[string]string{
+		"package.json": `{
+  "name": "tslib",
+  "exports": {
+    ".": {
+      "import": {
+        "node": "./modules/index.js"
+      }
+    }
+  }
+}`,
+		"index.js": "console.log('hello');\n",
+	})
+
+	detector := NewLangDetector("nodejs", "package.json", "js,ts,jsx,tsx", `"node": "`)
+	found, meta, err := detector.ScanFiles(fm)
+
+	if err != nil {
+		t.Fatalf("should not crash on invalid version, got error: %v", err)
+	}
+	if !found {
+		t.Error("expected found=true (js files exist)")
+	}
+	// No valid version found — meta should have no version key
+	if meta != nil && meta["version"] != "" {
+		t.Errorf("expected no version, got %s", meta["version"])
+	}
+}
+
+func TestLangDetector_IgnoresDeepNodeModules(t *testing.T) {
+	t.Parallel()
+
+	// node_modules at any depth should be ignored
+	fm := newStubFileManager(map[string]string{
+		"go.mod":                             "module example.com/test\n\ngo 1.21\n",
+		"main.go":                            "package main\n",
+		"src/infra/node_modules/pkg/go.mod":  "module pkg\n\ngo 1.18\n",
+		"src/infra/node_modules/pkg/main.go": "package main\n",
+	})
+
+	detector := NewLangDetector("golang", "go.mod", "go", "go ", WithVersionSemantics(VersionSemanticsMinimum))
+	found, meta, err := detector.ScanFiles(fm)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found {
+		t.Error("expected found=true")
+	}
+	// Should use 1.21 from root, not 1.18 from deep node_modules
+	if meta["version"] != "1.21.0" {
+		t.Errorf("expected version=1.21.0 (ignoring deep node_modules), got %s", meta["version"])
+	}
+}
+
 func TestLangDetector_ErrorsOnMissingTargetAndExtensions(t *testing.T) {
 	t.Parallel()
 

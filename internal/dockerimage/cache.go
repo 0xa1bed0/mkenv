@@ -104,7 +104,7 @@ func DefaultNaiveDockerImageCache(ctx context.Context) *DockerImageCache {
 	return defaultDockerImageCache
 }
 
-func (dic *DockerImageCache) get(ctx context.Context, key state.KVStoreKey) (ImageID, bool, state.KVStoreKey) {
+func (dic *DockerImageCache) get(ctx context.Context, key state.KVStoreKey, maxAge time.Duration) (ImageID, bool, state.KVStoreKey) {
 	if dic.kvStore == nil {
 		logs.Debugf("cache.get: kvStore is nil, cache disabled")
 		return "", false, key
@@ -124,6 +124,12 @@ func (dic *DockerImageCache) get(ctx context.Context, key state.KVStoreKey) (Ima
 	imageID := ImageID(entry.Value)
 	if imageID.isBuildingStale() {
 		logs.Debugf("cache.get: key=%s has stale building tag, deleting", key)
+		dic.delete(ctx, key)
+		return "", false, key
+	}
+
+	if maxAge > 0 && !entry.CreatedAt.IsZero() && time.Since(entry.CreatedAt) > maxAge {
+		logs.Infof("Cached image expired (age %s > max %s), invalidating cache entry key=%s", time.Since(entry.CreatedAt).Round(time.Second), maxAge, key)
 		dic.delete(ctx, key)
 		return "", false, key
 	}
@@ -158,22 +164,22 @@ func (dic *DockerImageCache) set(ctx context.Context, key state.KVStoreKey, valu
 	}
 }
 
-func (dic *DockerImageCache) GetByProject(ctx context.Context, project *runtime.Project) (ImageID, bool, state.KVStoreKey) {
+func (dic *DockerImageCache) GetByProject(ctx context.Context, project *runtime.Project, maxAge time.Duration) (ImageID, bool, state.KVStoreKey) {
 	key := cacheKeyFromProject(ctx, project)
 	if key == "" {
 		return "", false, key
 	}
 
-	return dic.get(ctx, key)
+	return dic.get(ctx, key, maxAge)
 }
 
-func (dic *DockerImageCache) GetByDockerfile(ctx context.Context, df dockerfile.Dockerfile) (ImageID, bool, state.KVStoreKey) {
+func (dic *DockerImageCache) GetByDockerfile(ctx context.Context, df dockerfile.Dockerfile, maxAge time.Duration) (ImageID, bool, state.KVStoreKey) {
 	key := cacheKeyFromDockerfile(df)
 	if key == "" {
 		return "", false, key
 	}
 
-	return dic.get(ctx, key)
+	return dic.get(ctx, key, maxAge)
 }
 
 func (dic *DockerImageCache) ClaimBuilding(ctx context.Context, rcKey state.KVStoreKey, dfKey state.KVStoreKey) string {

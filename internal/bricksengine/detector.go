@@ -9,6 +9,22 @@ import (
 	"github.com/0xa1bed0/mkenv/internal/versions"
 )
 
+// IsVersionChar reports whether b is a valid version-string character
+// (digits, dots, comparison operators, caret, pipe).
+func IsVersionChar(b byte) bool {
+	return unicode.IsDigit(rune(b)) || b == '.' || b == '>' || b == '<' || b == '=' || b == '^' || b == '|'
+}
+
+// HasDigit reports whether s contains at least one Unicode digit.
+func HasDigit(s string) bool {
+	for _, r := range s {
+		if unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
+}
+
 type BrickDetector interface {
 	// returns information about which brick this detector will try to detect
 	BrickInfo() *BrickInfo
@@ -80,19 +96,6 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 		return found, nil, nil
 	}
 
-	isVersionChar := func(b byte) bool {
-		return unicode.IsDigit(rune(b)) || b == '.' || b == '>' || b == '<' || b == '=' || b == '^' || b == '|'
-	}
-
-	hasDigit := func(s string) bool {
-		for _, r := range s {
-			if unicode.IsDigit(r) {
-				return true
-			}
-		}
-		return false
-	}
-
 	versionsFound := []string{}
 
 	for _, gomod := range result {
@@ -111,7 +114,7 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 			return false, nil, findError
 		}
 
-		version, defineVersionError := scanner.ReadWhile(32, isVersionChar)
+		version, defineVersionError := scanner.ReadWhile(32, IsVersionChar)
 		if defineVersionError != nil {
 			return false, nil, defineVersionError
 		}
@@ -119,7 +122,7 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 		v := string(version)
 
 		// Skip invalid version strings (e.g. "." extracted from paths like "./modules/index.js")
-		if !hasDigit(v) {
+		if !HasDigit(v) {
 			logs.Debugf("detector[%s]: skipping invalid version %q in %s (no digits)", ld.brickName, v, gomod)
 			continue
 		}
@@ -137,13 +140,17 @@ func (ld *langDetector) ScanFiles(folderPtr filesmanager.FileManager) (found boo
 		logs.Debugf("detector[%s]: all versions found: %v", ld.brickName, versionsFound)
 		versionToInstall, err := versions.MaxVersionFromConstraints(versionsFound)
 		if err != nil {
-			if !errors.Is(err, versions.ErrConflictingConstraints) {
-				return false, nil, err
+			if errors.Is(err, versions.ErrConflictingConstraints) {
+				logs.Warnf("Found evidence of conflicting versions for %s. Using the biggest one: %s", ld.brickName, versionToInstall)
+			} else {
+				logs.Warnf("Failed to parse version constraints %v for %s: %v. Using known latest", versionsFound, ld.brickName, err)
+				versionToInstall = ""
 			}
-			logs.Warnf("Found evidence of conflicting versions for %s. Using the biggest one: %s", ld.brickName, versionToInstall)
 		}
-		logs.Debugf("detector[%s]: selected version %s", ld.brickName, versionToInstall)
-		brickMeta["version"] = versionToInstall
+		if versionToInstall != "" {
+			logs.Debugf("detector[%s]: selected version %s", ld.brickName, versionToInstall)
+			brickMeta["version"] = versionToInstall
+		}
 	} else {
 		logs.Warnf("Can't estimate version for %s. Using known latest", ld.brickName)
 	}
