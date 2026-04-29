@@ -186,9 +186,9 @@ func (dc *DockerClient) RunContainer(ctx context.Context, projectName, projectPa
 		_ = dc.client.ContainerKill(context.Background(), containerID, "SIGTERM")
 	}()
 
-	// stdin → container
+	// stdin → container (use StdinReader so pinentry can grab stdin when paused)
 	go func() {
-		_, _ = io.Copy(attach.Conn, os.Stdin)
+		_, _ = io.Copy(attach.Conn, term.StdinReader())
 	}()
 
 	// container → stdout (TTY=true: merged)

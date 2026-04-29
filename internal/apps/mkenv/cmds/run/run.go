@@ -177,7 +177,7 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 
 	rt.Container().SetImageTag(string(imageID))
 
-	binds, groupAdd, err := mkbinds(signalsCtx, rt, project, opts.AddDockerSocket, opts.MountGPG)
+	binds, groupAdd, gpgAgentSocket, gpgSSHSocket, err := mkbinds(signalsCtx, rt, project, opts.AddDockerSocket, opts.MountGPG)
 	if err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	orchestratorExitChan := make(chan dockercontainer.OrchestratorExitSignal, 1)
-	containerOrchestrator, err := dockercontainer.NewContainerOrchestrator(rt, binds, groupAdd, dockerClient, orchestratorExitChan, opts.Command)
+	containerOrchestrator, err := dockercontainer.NewContainerOrchestrator(rt, binds, groupAdd, dockerClient, orchestratorExitChan, opts.Command, gpgAgentSocket, gpgSSHSocket)
 	if err != nil {
 		return err
 	}
@@ -198,10 +198,10 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 	return containerOrchestrator.Start()
 }
 
-func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project, addDockerSocket bool, mountGPG bool) ([]string, []string, error) {
+func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project, addDockerSocket bool, mountGPG bool) ([]string, []string, string, string, error) {
 	binds, err := ResolveBinds(project.EnvConfig(ctx).Volumes())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", "", err
 	}
 
 	binds = append(binds, project.Path()+":/"+filepath.Base(project.Path()))
@@ -211,7 +211,7 @@ func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project,
 
 	agentHostPath := hostappconfig.AgentBinaryPath(project.Name())
 	if err := agentdist.ExtractAgent(agentHostPath); err != nil {
-		return nil, nil, err
+		return nil, nil, "", "", err
 	}
 	//binds = append(binds, agentHostPath+":"+agentHostPath+":ro")
 	binds = append(binds, agentHostPath+"/mkenv:"+sandboxappconfig.UserLocalBin+"/mkenv:ro")
@@ -224,18 +224,18 @@ func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project,
 	if addDockerSocket {
 		socketPath, err := detectDockerSocketPath()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, "", "", err
 		}
 		binds = append(binds, socketPath+":/var/run/docker.sock")
 
 		// Detect the socket's owning GID so the container user can access it.
 		fi, err := os.Stat(socketPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("stat docker socket: %w", err)
+			return nil, nil, "", "", fmt.Errorf("stat docker socket: %w", err)
 		}
 		st, ok := fi.Sys().(*syscall.Stat_t)
 		if !ok {
-			return nil, nil, fmt.Errorf("cannot determine docker socket GID")
+			return nil, nil, "", "", fmt.Errorf("cannot determine docker socket GID")
 		}
 		// Always include GID 0 (root group) to handle nested Docker environments
 		// where the socket appears as root:root inside the container regardless of
@@ -248,17 +248,17 @@ func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project,
 		}
 	}
 
+	var gpgAgentSocket, gpgSSHSocket string
 	if mountGPG {
-		gpgSocketPath, err := detectGPGAgentSocketPath(ctx)
+		gpgAgentSocket, err = detectGPGAgentSocketPath(ctx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("GPG agent socket not found: %w\nEnsure gpg-agent is running (gpgconf --launch gpg-agent)", err)
+			return nil, nil, "", "", fmt.Errorf("GPG agent socket not found: %w\nEnsure gpg-agent is running (gpgconf --launch gpg-agent)", err)
 		}
-		binds = append(binds, gpgSocketPath+":"+tools.GPGAgentSocketDir+"/S.gpg-agent")
 
 		// Detect the socket's owning GID so the container user can access it.
-		fi, err := os.Stat(gpgSocketPath)
+		fi, err := os.Stat(gpgAgentSocket)
 		if err != nil {
-			return nil, nil, fmt.Errorf("stat GPG agent socket: %w", err)
+			return nil, nil, "", "", fmt.Errorf("stat GPG agent socket: %w", err)
 		}
 		if st, ok := fi.Sys().(*syscall.Stat_t); ok {
 			gid := fmt.Sprintf("%d", st.Gid)
@@ -269,15 +269,27 @@ func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project,
 			}
 		}
 
-		sshSocketPath, err := detectGPGSSHSocketPath(ctx)
+		gpgSSHSocket, err = detectGPGSSHSocketPath(ctx)
 		if err != nil {
 			logs.Warnf("GPG SSH socket not found, SSH via GPG agent will not work: %v", err)
-		} else {
-			binds = append(binds, sshSocketPath+":"+tools.GPGAgentSocketDir+"/S.gpg-agent.ssh")
+			gpgSSHSocket = ""
 		}
+
+		// Mount host GNUPG home directory (read-only) for private key stubs.
+		gnupgHome, err := detectGnupgHome(ctx)
+		if err != nil {
+			logs.Warnf("GPG home directory not found, encryption/decryption may not work: %v", err)
+		} else {
+			binds = append(binds, gnupgHome+":"+tools.GPGHostGnupgMount+":ro")
+		}
+
+		// Export public keys and ownertrust from host GPG in portable
+		// OpenPGP format (works across all GPG versions: kbx, keyboxd, etc.).
+		exportBinds := exportGPGData(ctx)
+		binds = append(binds, exportBinds...)
 	}
 
-	return binds, groupAdd, nil
+	return binds, groupAdd, gpgAgentSocket, gpgSSHSocket, nil
 }
 
 func detectDockerSocketPath() (string, error) {
@@ -315,6 +327,63 @@ func getRunOptions(ctx context.Context) *runOptions {
 		return nil
 	}
 	return v.(*runOptions)
+}
+
+// exportGPGData runs gpg --export and gpg --export-ownertrust on the host,
+// writes the output to temp files, and returns bind mount strings for them.
+func exportGPGData(ctx context.Context) []string {
+	var binds []string
+
+	exportCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	// Export public keys
+	pubkeys, err := exec.CommandContext(exportCtx, "gpg", "--batch", "--export").Output()
+	if err != nil {
+		logs.Warnf("Failed to export GPG public keys: %v", err)
+	} else if len(pubkeys) > 0 {
+		f, err := os.CreateTemp("", "mkenv-gpg-pubkeys-*.gpg")
+		if err == nil {
+			f.Write(pubkeys)
+			f.Close()
+			binds = append(binds, f.Name()+":"+tools.GPGExportedPubkeysPath+":ro")
+		}
+	}
+
+	// Export ownertrust
+	ownertrust, err := exec.CommandContext(exportCtx, "gpg", "--batch", "--export-ownertrust").Output()
+	if err != nil {
+		logs.Warnf("Failed to export GPG ownertrust: %v", err)
+	} else if len(ownertrust) > 0 {
+		f, err := os.CreateTemp("", "mkenv-gpg-ownertrust-*.txt")
+		if err == nil {
+			f.Write(ownertrust)
+			f.Close()
+			binds = append(binds, f.Name()+":"+tools.GPGExportedOwnertrustPath+":ro")
+		}
+	}
+
+	return binds
+}
+
+func detectGnupgHome(ctx context.Context) (string, error) {
+	if p := gpgconfListDir(ctx, "homedir"); p != "" {
+		return p, nil
+	}
+	if gnupgHome := os.Getenv("GNUPGHOME"); gnupgHome != "" {
+		if _, err := os.Stat(gnupgHome); err == nil {
+			return gnupgHome, nil
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	p := filepath.Join(home, ".gnupg")
+	if _, err := os.Stat(p); err == nil {
+		return p, nil
+	}
+	return "", fmt.Errorf("could not find GNUPG home directory")
 }
 
 func detectGPGAgentSocketPath(ctx context.Context) (string, error) {

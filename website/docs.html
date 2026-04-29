@@ -180,54 +180,96 @@ claude</code></pre>
 
     <section id="gpg-forwarding">
         <h2>GPG Agent Forwarding (YubiKey / Smartcard)</h2>
-        <p>If you use a YubiKey or smartcard for SSH authentication via GPG agent, you can forward your host's GPG agent into the mkenv container. This lets you use YubiKey-backed SSH and GPG signing inside the sandbox without exposing your keys.</p>
+        <p>If you use a YubiKey or smartcard with GPG, you can forward your host's GPG agent into the mkenv container. This lets you use YubiKey-backed SSH authentication, GPG signing, and file encryption/decryption inside the sandbox — just like on your host, without exposing your keys.</p>
 
         <h3>Usage</h3>
         <pre><code>mkenv . --mount-gpg</code></pre>
 
         <h3>How It Works</h3>
-        <ul>
-            <li>mkenv detects your host's GPG agent sockets (via <code>gpgconf</code>)</li>
-            <li>The GPG agent socket and SSH socket are mounted read-only into the container</li>
-            <li><code>SSH_AUTH_SOCK</code> is set automatically to use the GPG agent for SSH</li>
-            <li>PIN prompts appear on your host machine (where the YubiKey is plugged in)</li>
-        </ul>
+        <p>mkenv does three things when you pass <code>--mount-gpg</code>:</p>
+        <ol>
+            <li><strong>Socket forwarding</strong> — creates a local proxy for your GPG agent sockets and forwards all GPG and SSH agent traffic to the host agent. Your private keys never leave the host.</li>
+            <li><strong>Keyring import</strong> — exports your public keys and trust database from the host (<code>gpg --export</code>) and imports them into the container. This works across all GPG versions (2.2 with kbx, 2.4+ with keyboxd). Private key stubs (smartcard references, no secret material) are also copied so GPG knows which keys live on your YubiKey.</li>
+            <li><strong>Pinentry management</strong> — when an SSH sign request requires your YubiKey PIN, the proxy automatically pauses the container terminal, lets your pinentry program render cleanly, and resumes after you enter the PIN.</li>
+        </ol>
+        <p>The result: <code>gpg --list-secret-keys</code>, <code>gpg --encrypt</code>, <code>gpg --decrypt</code>, <code>gpg --sign</code>, and SSH all work inside the container exactly as they do on your host.</p>
 
         <h3>Prerequisites</h3>
         <ul>
-            <li>GPG agent running on the host with SSH support enabled</li>
+            <li>GPG agent running on the host with SSH support enabled (<code>enable-ssh-support</code> in <code>gpg-agent.conf</code>)</li>
             <li>YubiKey or smartcard configured for GPG/SSH</li>
             <li>On macOS: GPG Suite or Homebrew <code>gnupg</code> with <code>gpg-agent</code> running</li>
         </ul>
 
-        <h3>PIN Entry</h3>
-        <p>Since the GPG agent runs on your host (not inside the container), PIN prompts appear on your host machine.</p>
-        <div class="note">
-            <strong>Important:</strong> Terminal-based pinentry programs (<code>pinentry-curses</code>, <code>pinentry-tty</code>) are not compatible with <code>--mount-gpg</code>. The mkenv process holds the host terminal in raw mode, which causes rendering corruption and input leaking when pinentry tries to prompt on any terminal in the same emulator. Use <code>pinentry-mac</code> instead — it shows a native macOS dialog window that is fully independent of the terminal.
-        </div>
-        <h4>Setup (macOS)</h4>
-        <pre><code># Install pinentry-mac
-brew install pinentry-mac
+        <h3>PIN Entry Setup</h3>
+        <p>Before launching mkenv, tell the GPG agent which terminal to use for PIN prompts:</p>
+        <pre><code># Run this in the same terminal where you'll launch mkenv
+gpg-connect-agent updatestartuptty /bye</code></pre>
+        <p><strong>Tip:</strong> Add an alias to your shell config to make this easier:</p>
+        <pre><code># In ~/.zshrc or ~/.bashrc
+alias gpghere="gpg-connect-agent updatestartuptty /bye"</code></pre>
+        <p>Then just run <code>gpghere</code> before <code>mkenv</code>.</p>
 
-# Configure GPG agent to use it
-echo "pinentry-program /opt/homebrew/bin/pinentry-mac" &gt; ~/.gnupg/gpg-agent.conf
+        <h3>Supported Pinentry Programs</h3>
+        <p>All pinentry programs work with <code>--mount-gpg</code>:</p>
+        <ul>
+            <li><code>pinentry-tty</code> — plain text prompt, no curses rendering, works well in shared terminal environments</li>
+            <li><code>pinentry-curses</code> — TUI box with ncurses, renders cleanly when mkenv pauses the terminal</li>
+            <li><code>pinentry-mac</code> — native macOS dialog, fully independent of the terminal</li>
+        </ul>
 
-# Restart the agent
-gpgconf --kill gpg-agent</code></pre>
-        <p>After this, PIN prompts will appear as a native macOS popup window — no terminal conflicts regardless of what mkenv or tmux is doing.</p>
+        <h3>Example Workflow</h3>
+        <pre><code># Terminal setup
+gpghere
+
+# Launch mkenv with GPG forwarding
+mkenv . --mount-gpg
+
+# Inside the container — SSH uses your YubiKey automatically
+ssh root@your-server.com
+# → PIN prompt appears on the host
+# → Enter PIN, press Enter
+# → SSH session opens
+
+# Encryption/decryption works too
+gpg --encrypt -r your@email.com secrets.env
+gpg --decrypt secrets.env.gpg
+# → YubiKey touch/PIN prompt on the host
+
+# Signing
+gpg --sign --armor message.txt</code></pre>
 
         <h3>Combining with Ansible</h3>
         <p>For infrastructure automation with YubiKey-backed SSH:</p>
         <pre><code>mkenv . --mount-gpg --tools ansible</code></pre>
-        <p>This gives you a sandboxed environment where Ansible can SSH to remote hosts using your YubiKey for authentication.</p>
+        <p>This gives you a sandboxed environment where Ansible can SSH to remote hosts using your YubiKey for authentication. Run playbooks, manage inventory, and use <code>ansible-vault</code> — all isolated from your host.</p>
+
+        <h4>Ansible with PIN caching (default)</h4>
+        <p>Most GPG agent configurations cache the PIN after the first entry (this is the default). Ansible works seamlessly — the first SSH connection prompts for your PIN, and subsequent parallel connections use the cached PIN without any terminal disruption.</p>
+
+        <h4>Ansible without PIN caching / with touch-required YubiKey</h4>
+        <p>If you've disabled PIN caching or configured your YubiKey to require a touch for every operation, each SSH connection needs a separate PIN entry or touch. Ansible opens multiple SSH connections in parallel by default, which can cause overlapping PIN prompts.</p>
+        <p>Use <code>--forks 1</code> to serialize connections so each gets a clean PIN prompt:</p>
+        <pre><code>ansible-playbook -i inventory.yml deploy.yml --forks 1</code></pre>
+        <p>Alternatively, set <code>forks = 1</code> in your <code>ansible.cfg</code>:</p>
+        <pre><code>[defaults]
+forks = 1</code></pre>
     </section>
 
     <section id="ansible">
         <h2>Ansible</h2>
         <p>Install Ansible inside your mkenv container for infrastructure automation:</p>
         <pre><code>mkenv . --tools ansible</code></pre>
-        <p>This installs Ansible via pip along with its dependencies (<code>python3</code>, <code>sshpass</code>). All standard Ansible CLI tools are available: <code>ansible</code>, <code>ansible-playbook</code>, <code>ansible-galaxy</code>, <code>ansible-vault</code>, etc.</p>
+        <p>This installs Ansible via pip along with its dependencies (<code>python3</code>, <code>sshpass</code>). All standard Ansible CLI tools are available: <code>ansible</code>, <code>ansible-playbook</code>, <code>ansible-galaxy</code>, <code>ansible-vault</code>, <code>ansible-inventory</code>, <code>ansible-doc</code>, etc.</p>
         <p>Ansible's pip cache and <code>~/.ansible</code> directory are persisted across container restarts.</p>
+
+        <h3>Usage with GPG/YubiKey SSH</h3>
+        <pre><code># Infrastructure automation with hardware-backed SSH keys
+mkenv . --mount-gpg --tools ansible
+
+# Inside the container
+ansible-playbook -i inventory.yml deploy.yml</code></pre>
+        <p>Ansible SSH connections will use your YubiKey for authentication — PIN prompts appear on your host terminal when needed.</p>
     </section>
 
     <section id="commands">
@@ -254,7 +296,7 @@ gpgconf --kill gpg-agent</code></pre>
                 <tr>
                     <td><code>--tools</code></td>
                     <td>comma list</td>
-                    <td>Extra tools to preinstall (e.g. <code>codex,claude,nvim,tmux,pulumi</code>).</td>
+                    <td>Extra tools to preinstall (e.g. <code>codex,claude,nvim,tmux,pulumi,ansible</code>).</td>
                     <td>none</td>
                 </tr>
                 <tr>
@@ -290,7 +332,7 @@ gpgconf --kill gpg-agent</code></pre>
                 <tr>
                     <td><code>--mount-gpg</code></td>
                     <td>bool</td>
-                    <td>Mount host GPG agent sockets into the container. Enables SSH via YubiKey/smartcard and GPG signing inside the sandbox.</td>
+                    <td>Forward host GPG agent into the container. Enables SSH, signing, and encryption/decryption via YubiKey/smartcard. Imports your public keyring automatically.</td>
                     <td>false</td>
                 </tr>
                 <tr>
@@ -666,6 +708,12 @@ mkenv . -c "exit 42"; echo $?   # prints 42</code></pre>
 
         <h3>IDE integration?</h3>
         <p>VS Code and Cursor can connect to mkenv containers using their remote development features. Dedicated plugins coming soon.</p>
+
+        <h3>Can I use my YubiKey / smartcard inside the container?</h3>
+        <p>Yes. Use <code>--mount-gpg</code> to forward your host's GPG agent into the container. SSH, GPG signing, encryption, and decryption all work — your public keyring is imported automatically and all crypto operations are forwarded to the host agent. Run <code>gpg-connect-agent updatestartuptty /bye</code> before launching mkenv so the agent knows where to show PIN prompts. See <a href="#gpg-forwarding">GPG Agent Forwarding</a> for full details.</p>
+
+        <h3>Can I use Ansible inside the container?</h3>
+        <p>Yes. Use <code>--tools ansible</code> to install Ansible. Combine with <code>--mount-gpg</code> for YubiKey-backed SSH to remote hosts. See <a href="#ansible">Ansible</a> for details.</p>
     </section>
 </div>
 <footer>

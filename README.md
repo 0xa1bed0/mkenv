@@ -52,7 +52,7 @@ sudo mv mkenv /usr/local/bin/
 - **Blocked sensitive paths** — Can't mount `~/.ssh`, `~/.aws`, `~/.docker`, browser profiles, password managers
 - **Pre-flight secret scan** — Scans your project for `.env` files, API keys, private keys before starting
 - **Network audit** — All traffic logged locally. System-critical ports blocked by default
-- **GPG agent forwarding** — Use YubiKey/smartcard SSH inside the container with `--mount-gpg`
+- **GPG agent forwarding** — Use YubiKey/smartcard for SSH, signing, and encryption/decryption inside the container with `--mount-gpg`. Public keyring is imported automatically, PIN prompts render cleanly on the host
 - **Policy engine** — Protects devs from accidental mistakes. Teams can enforce their own rules
 
 ### Hardened by default
