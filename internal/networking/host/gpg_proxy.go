@@ -3,12 +3,14 @@ package host
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,19 +26,32 @@ const (
 	sshAgentFailure      = 5
 )
 
-// UpdateGPGStartupTTY runs "gpg-connect-agent updatestartuptty /bye" on the
-// host so that the gpg-agent reattaches pinentry to the current terminal.
-// This is best-effort — if gpg-connect-agent is not installed or fails, we
-// log and continue (the proxy will still work, pinentry just might appear
-// on a stale TTY).
-func UpdateGPGStartupTTY() {
+// ClaimGPGTTY runs "gpg-connect-agent updatestartuptty /bye" on the host
+// so that gpg-agent reattaches pinentry to the controlling terminal of this
+// process. Returns the resolved TTY path along with the command's stdout,
+// stderr, and exit code. err is non-nil only for setup failures (e.g. binary
+// missing); a non-zero exit from gpg-connect-agent is reflected in exitCode.
+func ClaimGPGTTY() (tty, stdout, stderr string, exitCode int, err error) {
+	tty = ttyName()
+
+	var stdoutBuf, stderrBuf strings.Builder
 	cmd := exec.Command("gpg-connect-agent", "updatestartuptty", "/bye")
-	cmd.Env = append(os.Environ(), "GPG_TTY="+ttyName())
-	if out, err := cmd.CombinedOutput(); err != nil {
-		logs.Debugf("gpg-connect-agent updatestartuptty: %v: %s", err, out)
-	} else {
-		logs.Debugf("gpg-connect-agent updatestartuptty: OK")
+	cmd.Env = append(os.Environ(), "GPG_TTY="+tty)
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	runErr := cmd.Run()
+	stdout = stdoutBuf.String()
+	stderr = stderrBuf.String()
+
+	if runErr != nil {
+		var exitErr *exec.ExitError
+		if errors.As(runErr, &exitErr) {
+			return tty, stdout, stderr, exitErr.ExitCode(), nil
+		}
+		return tty, stdout, stderr, -1, runErr
 	}
+	return tty, stdout, stderr, 0, nil
 }
 
 // ttyName returns the name of the controlling terminal, or empty string.

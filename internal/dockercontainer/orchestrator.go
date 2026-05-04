@@ -83,11 +83,6 @@ func NewContainerOrchestrator(rt *runtime.Runtime, binds, groupAdd []string, doc
 
 		// Start GPG socket proxy if GPG forwarding was requested.
 		if gpgAgentSocketPath != "" || gpgSSHSocketPath != "" {
-			// Tell the host gpg-agent to use our current TTY for pinentry.
-			// Without this, pinentry may be attached to a different terminal
-			// session (e.g. the one where the agent was originally started).
-			host.UpdateGPGStartupTTY()
-
 			// Use /tmp as base dir — Unix socket paths have a 104-byte limit on macOS,
 			// so longer paths like ~/.config/mkenv/projects/... would fail.
 			// /tmp is shared with Docker Desktop's VM by default.
@@ -148,6 +143,7 @@ func (co *ContainerOrchestrator) startEnv() {
 		co.controlAPI.ServerProtocol.Handle(co.onExpose())
 		co.controlAPI.ServerProtocol.Handle(co.onGetBlockedPorts())
 		co.controlAPI.ServerProtocol.Handle(co.onInstallRequest())
+		co.controlAPI.ServerProtocol.Handle(co.onGPGClaimTTY())
 		co.controlAPI.ServerProtocol.Handle(co.onLog())
 		co.controlAPI.ServerProtocol.Handle(co.onFetchLogs())
 	})
@@ -382,6 +378,22 @@ func (co *ContainerOrchestrator) onInstallRequest() (string, protocol.ControlCom
 		}
 
 		return &shared.OnInstallResponse{Logs: response.String()}, nil
+	}
+}
+
+func (co *ContainerOrchestrator) onGPGClaimTTY() (string, protocol.ControlCommandHandler) {
+	return "mkenv.sandbox.gpg-claim-tty", func(ctx context.Context, req protocol.ControlSignalEnvelope) (any, error) {
+		tty, stdout, stderr, exitCode, err := host.ClaimGPGTTY()
+		if err != nil {
+			return nil, fmt.Errorf("claim GPG TTY: %w", err)
+		}
+		logs.Debugf("gpg-claim-tty: tty=%s exit=%d", tty, exitCode)
+		return &shared.GPGClaimTTYResponse{
+			TTY:      tty,
+			Stdout:   stdout,
+			Stderr:   stderr,
+			ExitCode: exitCode,
+		}, nil
 	}
 }
 

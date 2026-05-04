@@ -147,6 +147,28 @@ func (c *ControlClient) Install(ctx context.Context, pkgName string) (*shared.On
 	return &response, nil
 }
 
+func (c *ControlClient) GPGClaimTTY(ctx context.Context) (*shared.GPGClaimTTYResponse, error) {
+	reqID := protocol.NewID()
+
+	req, err := protocol.PackControlSignalEnvelope[*struct{}](reqID, "mkenv.sandbox.gpg-claim-tty", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	responseEnvelope, err := c.conn.Call(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var response shared.GPGClaimTTYResponse
+	err = protocol.UnpackControlSignalEnvelope(responseEnvelope, &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
 func (c *ControlClient) SendLog(line string) error {
 	req, _ := protocol.PackControlSignalEnvelope(protocol.NewID(), "mkenv.sandbox.log", &shared.LogEntry{Line: line})
 	return c.conn.Send(req)

@@ -27,6 +27,13 @@ type OnInstallResponse struct {
 	Logs string `json:"logs"`
 }
 
+type GPGClaimTTYResponse struct {
+	TTY      string `json:"tty"`
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+	ExitCode int    `json:"exit_code"`
+}
+
 type Expose struct {
 	Listener Listener `json:"listener"`
 }
