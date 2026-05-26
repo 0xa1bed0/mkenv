@@ -65,3 +65,5 @@ temp/
 .gomod
 testproj
 Dockerfile
+mkenv
+
