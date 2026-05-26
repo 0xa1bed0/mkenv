@@ -83,11 +83,17 @@ Most projects need zero configuration. When you do need to customize:
 // .mkenv in project root
 {
   "enabled_bricks": ["claude-code", "nvim"],
-  "volumes": ["~/data:/data"]
+  "volumes": ["~/data:/data"],
+  "envs": {
+    "API_BASE": "https://api.example.com",
+    "API_TOKEN": "mkenv_value_from:~/secrets/api-token"
+  }
 }
 ```
 
 Bricks are atomic building blocks — things like `claude-code`, `nvim`, `node`, `go`.
+
+Use `envs` to inject environment variables into the container. Plain string values are passed through as-is. Values starting with `mkenv_value_from:<path>` are read from the named host file at container start — the contents never enter the docker image, and resolved values are never logged. Paths must be absolute or `~/`-prefixed; reads are sandboxed by the same guardrails that block credential mounts (`~/.ssh`, `~/.aws`, `/etc`, etc.).
 
 For security policies enforcement, see [policy documentation](https://mkenv.sh/docs.html#policies).
 

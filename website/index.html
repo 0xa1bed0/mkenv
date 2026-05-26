@@ -112,8 +112,13 @@
         <p>Bricks are atomic building blocks that mkenv uses to generate your environment — things like <code>claude-code</code>, <code>nvim</code>, <code>node</code>, <code>go</code>.</p>
         <pre><code>{
   "enabled_bricks": ["claude", "nvim"],
-  "volumes": ["~/data:/data"]
+  "volumes": ["~/data:/data"],
+  "envs": {
+    "API_BASE": "https://api.example.com",
+    "API_TOKEN": "mkenv_value_from:~/secrets/api-token"
+  }
 }</code></pre>
+        <p>Inject environment variables into the container with <code>envs</code>. Values prefixed with <code>mkenv_value_from:</code> are read from a host file at container start — secrets never enter the docker image and resolved values are never logged.</p>
         <p><a href="docs.html#mkenv-files">Full .mkenv documentation →</a></p>
 
         <h3>Policy Configuration</h3>

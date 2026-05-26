@@ -94,6 +94,30 @@ sudo mv mkenv /usr/local/bin/</code></pre>
 }</code></pre>
         <p>These packages will be installed via the system's package manager (e.g., apt-get on Debian-based systems).</p>
 
+        <h3>Example: Custom Environment Variables (with secrets)</h3>
+        <p>Inject environment variables into the container. Literal values are passed through; values prefixed with <code>mkenv_value_from:&lt;path&gt;</code> are read from a host file at container start.</p>
+        <pre><code>{
+  "envs": {
+    "API_BASE":  "https://api.example.com",
+    "API_TOKEN": "mkenv_value_from:~/secrets/api-token",
+    "DEPLOY_KEY": "mkenv_value_from:/home/me/.config/myapp/deploy.key"
+  }
+}</code></pre>
+        <p>Secret values resolved via <code>mkenv_value_from:</code> are <strong>never baked into the docker image</strong> and never logged — they are injected at container creation time and live only for the lifetime of the container.</p>
+        <p><strong>Security guarantees for <code>mkenv_value_from:</code>:</strong></p>
+        <ul>
+            <li>Paths must be absolute or <code>~/</code>-prefixed. Relative paths are rejected.</li>
+            <li>Symlinks are fully resolved, then checked against the same guardrails that protect mounts — you cannot read from <code>~/.ssh</code>, <code>~/.aws</code>, <code>~/.gnupg</code>, <code>/etc</code>, <code>/proc</code>, browser/password-manager directories, or any other protected path. Symlink-escape attempts are blocked post-resolution.</li>
+            <li>Only regular files are accepted (no FIFOs, devices, sockets, or directories).</li>
+            <li>File size is capped at 1&nbsp;MiB.</li>
+            <li>NUL bytes in paths, names, or content cause an error rather than a cryptic docker failure.</li>
+            <li>Exactly one trailing newline (<code>\n</code> or <code>\r\n</code>) is trimmed; internal newlines are preserved so multi-line values such as PEM keys work.</li>
+            <li>World/group-readable files print a warning prompting you to <code>chmod 600</code>.</li>
+            <li>If any env in the map fails resolution, the container does not start — there is no partial-env mode.</li>
+        </ul>
+        <p><strong>Reserved names:</strong> the <code>MKENV_</code> prefix is reserved for mkenv-internal variables, and loader-hijack names (<code>LD_PRELOAD</code>, <code>LD_LIBRARY_PATH</code>, <code>LD_AUDIT</code>, <code>DYLD_INSERT_LIBRARIES</code>, <code>DYLD_LIBRARY_PATH</code>, <code>DYLD_FALLBACK_LIBRARY_PATH</code>) are blocked.</p>
+        <p><strong>Note:</strong> custom envs are applied at <em>container-run</em> time, not at image-build time. Changing an <code>envs</code> entry does not trigger a rebuild — restart the container to pick up the new value.</p>
+
         <h3>How It Works</h3>
         <ul>
             <li>mkenv walks up from your project directory to the filesystem root</li>
@@ -136,6 +160,11 @@ sudo mv mkenv /usr/local/bin/</code></pre>
                     <td><code>disable_auto</code></td>
                     <td>boolean</td>
                     <td>Disable automatic language detection (default: <code>false</code>)</td>
+                </tr>
+                <tr>
+                    <td><code>envs</code></td>
+                    <td>object (string&nbsp;→&nbsp;string)</td>
+                    <td>Environment variables to set in the container. Literal values are passed through; values prefixed with <code>mkenv_value_from:&lt;path&gt;</code> are read from a host file at container start (secrets never enter the image). See the example above for the security model.</td>
                 </tr>
             </tbody>
         </table>

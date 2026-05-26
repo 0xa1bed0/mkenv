@@ -153,7 +153,11 @@ func (co *ContainerOrchestrator) startEnv() {
 	co.rt.Container().SetStopContainer(cancelContainer)
 
 	// Build environment variables including reverse proxy address
-	envs := co.getEnvVars()
+	envs, err := co.getEnvVars(containerCtx)
+	if err != nil {
+		co.exitCh <- OrchestratorExitSignal{Err: fmt.Errorf("resolve env vars: %w", err)}
+		return
+	}
 
 	containerID, containerPortReservation, err := co.dockerClient.CreateContainer(containerCtx, co.rt.Project(), co.rt.Container().ImageTag(), envs, co.binds, co.groupAdd)
 	if err != nil {
@@ -195,6 +199,17 @@ func (co *ContainerOrchestrator) startCommandEnv() {
 		envs = append(envs, "TZ="+tz)
 	}
 
+	customEnvs, err := runtime.ResolveCustomEnvs(co.rt.Project().EnvConfig(ctx).Envs())
+	if err != nil {
+		co.exitCh <- OrchestratorExitSignal{Err: fmt.Errorf("resolve env vars: %w", err)}
+		return
+	}
+	if err := rejectCustomEnvCollisions(envs, customEnvs); err != nil {
+		co.exitCh <- OrchestratorExitSignal{Err: err}
+		return
+	}
+	envs = append(envs, customEnvs...)
+
 	containerID, err := co.dockerClient.CreateCommandContainer(ctx, co.rt.Project(), co.rt.Container().ImageTag(), envs, co.binds, co.groupAdd, co.command)
 	if err != nil {
 		co.exitCh <- OrchestratorExitSignal{Err: err}
@@ -216,23 +231,60 @@ func (co *ContainerOrchestrator) startCommandEnv() {
 }
 
 // getEnvVars builds the complete set of environment variables for the container,
-// including control API and reverse proxy addresses
-func (co *ContainerOrchestrator) getEnvVars() []string {
-	envs := make([]string, len(co.controlAPI.Env))
-	copy(envs, co.controlAPI.Env)
-
-	// Add reverse proxy address for container to dial back to host
-	reverseProxyPort := co.reverseProxy.Port()
-	reverseProxyEnv := fmt.Sprintf("MKENV_REVERSE_PROXY=host.docker.internal:%d", reverseProxyPort)
-	envs = append(envs, reverseProxyEnv)
-
-	// Pass host timezone so container timestamps match the host
+// including control API, reverse proxy addresses, host timezone, and any
+// user-defined envs declared in .mkenv. Custom envs are resolved through the
+// safe resolver (see runtime.ResolveCustomEnvs) and the call fails closed on
+// any resolution error so the container never starts with a partial env set.
+//
+// mkenv-managed envs are appended first and any collision with a user-defined
+// env name causes an explicit error. We do not pick a "last-write-wins" side
+// because either direction is wrong: silently letting the user override
+// MKENV_RPC breaks the control channel; silently letting mkenv override the
+// user's value would be a confusing footgun. Naming the conflict is the only
+// correct UX.
+func (co *ContainerOrchestrator) getEnvVars(ctx context.Context) ([]string, error) {
+	envs := make([]string, 0, len(co.controlAPI.Env)+4)
+	envs = append(envs, co.controlAPI.Env...)
+	envs = append(envs, fmt.Sprintf("MKENV_REVERSE_PROXY=host.docker.internal:%d", co.reverseProxy.Port()))
 	if tz := hostTimezone(); tz != "" {
 		envs = append(envs, "TZ="+tz)
 	}
 
-	logs.Debugf("Container env vars: %v", envs)
-	return envs
+	customEnvs, err := runtime.ResolveCustomEnvs(co.rt.Project().EnvConfig(ctx).Envs())
+	if err != nil {
+		return nil, err
+	}
+	if err := rejectCustomEnvCollisions(envs, customEnvs); err != nil {
+		return nil, err
+	}
+	envs = append(envs, customEnvs...)
+
+	// Log count only — custom envs may include resolved secret values.
+	logs.Debugf("Container env vars (%d entries)", len(envs))
+	return envs, nil
+}
+
+// rejectCustomEnvCollisions returns an error if any user-defined env name would
+// shadow an mkenv-managed env. mkenvEnvs and customEnvs are docker-style
+// "KEY=VAL" strings.
+func rejectCustomEnvCollisions(mkenvEnvs, customEnvs []string) error {
+	reserved := make(map[string]struct{}, len(mkenvEnvs))
+	for _, e := range mkenvEnvs {
+		if i := strings.IndexByte(e, '='); i > 0 {
+			reserved[e[:i]] = struct{}{}
+		}
+	}
+	for _, e := range customEnvs {
+		i := strings.IndexByte(e, '=')
+		if i <= 0 {
+			continue
+		}
+		name := e[:i]
+		if _, clash := reserved[name]; clash {
+			return fmt.Errorf("custom env %q collides with an mkenv-managed variable and cannot be set from .mkenv", name)
+		}
+	}
+	return nil
 }
 
 // hostTimezone returns the IANA timezone name of the host (e.g. "Europe/Kyiv").

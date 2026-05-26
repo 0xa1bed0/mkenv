@@ -27,6 +27,7 @@ type EnvConfig interface {
 	ShouldDisableAuto() bool
 	Volumes() []string
 	ExtraPkgs() []string
+	Envs() map[string]string // raw env-var spec (may contain "mkenv_value_from:..." directives); resolve via ResolveCustomEnvs
 
 	FilePath() string           // path to .mkenv file that correspond to this env config
 	Signature() (string, error) // return signature of the object
@@ -42,6 +43,7 @@ type envConfig struct {
 	ShouldDisableAuto_        bool                                       `json:"disable_auto"`
 	Volumes_                  []string                                   `json:"volumes"`
 	ExtraPkgs_                []string                                   `json:"extra_pkgs"`
+	Envs_                     map[string]string                          `json:"envs"`
 }
 
 func (ec envConfig) Copy() *envConfig {
@@ -67,6 +69,10 @@ func (ec envConfig) Copy() *envConfig {
 	for _, pkg := range ec.ExtraPkgs_ {
 		newEncConfig.ExtraPkgs_ = append(newEncConfig.ExtraPkgs_, pkg)
 	}
+	newEncConfig.Envs_ = map[string]string{}
+	for k, v := range ec.Envs_ {
+		newEncConfig.Envs_[k] = v
+	}
 	return newEncConfig
 }
 
@@ -78,6 +84,9 @@ func (ec *envConfig) Signature() (string, error) {
 	// should not be included to sugnature because signature is a part of docker image cache key.
 	// TODO: move this whole signature function to the state package. it should not be here
 	ecCopy.Volumes_ = []string{}
+	// Envs are applied at container-run time (not baked into image), and may contain
+	// secret-from-file directives whose resolved value must never enter the cache key.
+	ecCopy.Envs_ = map[string]string{}
 
 	data, err := json.Marshal(ecCopy)
 	if err != nil {
@@ -144,6 +153,16 @@ func WithVolumes(volumes []string) envConfigOption {
 	}
 }
 
+func WithEnvs(envs map[string]string) envConfigOption {
+	return func(rc *envConfig) {
+		if envs == nil {
+			return
+		}
+		rc.Envs_ = make(map[string]string, len(envs))
+		maps.Copy(rc.Envs_, envs)
+	}
+}
+
 func BuildEnvConfig(opts ...envConfigOption) EnvConfig {
 	cfg := buildDefaultEnvConfig()
 	cfg.name = "built-inmemmory"
@@ -166,6 +185,7 @@ func buildDefaultEnvConfig() *envConfig {
 		ShouldDisableAuto_:        false,
 		Volumes_:                  []string{},
 		ExtraPkgs_:                []string{},
+		Envs_:                     map[string]string{},
 	}
 }
 
@@ -226,6 +246,17 @@ func (ec *envConfig) Merge(src EnvConfig) {
 	for _, pkg := range src.ExtraPkgs() {
 		logs.Debugf("Extra package %s requested by %s", pkg, src.FilePath())
 	}
+
+	srcEnvs := src.Envs()
+	if len(srcEnvs) > 0 && ec.Envs_ == nil {
+		ec.Envs_ = make(map[string]string, len(srcEnvs))
+	}
+	for k, v := range srcEnvs {
+		ec.Envs_[k] = v
+		// Log only the key. The value may be a secret-from-file directive or, after
+		// resolution elsewhere, a literal secret — never log it.
+		logs.Debugf("Custom env %s defined by %s", k, src.FilePath())
+	}
 }
 
 func (ec *envConfig) FilePath() string {
@@ -274,6 +305,12 @@ func (ec *envConfig) ShouldDisableAuto() bool {
 func (ec *envConfig) ExtraPkgs() []string {
 	out := []string{}
 	out = append(out, ec.ExtraPkgs_...)
+	return out
+}
+
+func (ec *envConfig) Envs() map[string]string {
+	out := make(map[string]string, len(ec.Envs_))
+	maps.Copy(out, ec.Envs_)
 	return out
 }
 
@@ -370,6 +407,9 @@ func loadPreferencesFile(path string) (*envConfig, error) {
 	}
 	if p.BricksConfigs_ == nil {
 		p.BricksConfigs_ = make(map[bricksengine.BrickID]map[string]string)
+	}
+	if p.Envs_ == nil {
+		p.Envs_ = make(map[string]string)
 	}
 	p.name = path
 	return &p, nil
