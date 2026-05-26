@@ -83,15 +83,12 @@ func (ro *runOptions) EnvConfig() runtime.EnvConfig {
 		enableBricks = append(enableBricks, "docker-cli")
 	}
 
-	if ro.MountGPG {
-		enableBricks = append(enableBricks, "gpg-agent")
-	}
-
 	cliRunConfig := runtime.BuildEnvConfig(
 		runtime.WithEnableBricks(enableBricks),
 		runtime.WithDefaultEntrypointBrickID(bricksengine.BrickID(ro.Entrypoint)),
 		runtime.WithDefaultSystemBrickID(bricksengine.BrickID(ro.System)),
 		runtime.WithVolumes(ro.Volumes),
+		runtime.WithMountGPG(ro.MountGPG),
 	)
 
 	return cliRunConfig
@@ -177,7 +174,9 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 
 	rt.Container().SetImageTag(string(imageID))
 
-	binds, groupAdd, gpgAgentSocket, gpgSSHSocket, err := mkbinds(signalsCtx, rt, project, opts.AddDockerSocket, opts.MountGPG)
+	mountGPG := project.EnvConfig(signalsCtx).MountGPG()
+
+	binds, groupAdd, gpgAgentSocket, gpgSSHSocket, err := mkbinds(signalsCtx, rt, project, opts.AddDockerSocket, mountGPG)
 	if err != nil {
 		return err
 	}

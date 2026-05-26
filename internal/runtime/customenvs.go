@@ -45,11 +45,11 @@ var reservedEnvPrefixes = []string{"MKENV_"}
 // a stray .mkenv file (e.g. inherited from a parent directory) cannot quietly
 // inject a preload library or alter the dynamic loader's search path.
 var dangerousEnvNames = map[string]struct{}{
-	"LD_PRELOAD":             {},
-	"LD_LIBRARY_PATH":        {},
-	"LD_AUDIT":               {},
-	"DYLD_INSERT_LIBRARIES":  {},
-	"DYLD_LIBRARY_PATH":      {},
+	"LD_PRELOAD":                 {},
+	"LD_LIBRARY_PATH":            {},
+	"LD_AUDIT":                   {},
+	"DYLD_INSERT_LIBRARIES":      {},
+	"DYLD_LIBRARY_PATH":          {},
 	"DYLD_FALLBACK_LIBRARY_PATH": {},
 }
 
@@ -78,23 +78,23 @@ var (
 //  2. Literal values are scanned for NUL bytes (docker rejects them, but we
 //     surface a clear error rather than a cryptic docker failure).
 //  3. The "mkenv_value_from:<path>" directive:
-//       a. Requires absolute or "~/..." path. Relative paths are rejected to
-//          remove cwd-vs-mkenv-file-vs-project-root ambiguity.
-//       b. Path is symlink-resolved with utils.ResolvePathStrict, then checked
-//          against guardrails.IsAbsolutelyForbidden. A symlink that escapes
-//          into ~/.ssh, ~/.aws, /etc, /dev, etc. is rejected POST-resolution,
-//          so symlink-based escape is closed.
-//       c. The file is os.Lstat'd to assert it is a regular file (no fifo /
-//          device / directory).
-//       d. Read is capped at maxSecretFileSize bytes — even if Stat lied,
-//          io.LimitReader prevents unbounded consumption.
-//       e. Content must not contain a NUL byte.
-//       f. World/group-readable files trigger a loud warning (the user has
-//          stored a credential carelessly), but do not block.
-//       g. Exactly one trailing newline (\n or \r\n) is trimmed — files
-//          created with `echo "tok" > f` have one. Internal newlines (PEM
-//          keys, multi-line tokens) are preserved.
-//       h. Empty resolved values are rejected (almost always a misconfig).
+//     a. Requires absolute or "~/..." path. Relative paths are rejected to
+//     remove cwd-vs-mkenv-file-vs-project-root ambiguity.
+//     b. Path is symlink-resolved with utils.ResolvePathStrict, then checked
+//     against guardrails.IsAbsolutelyForbidden. A symlink that escapes
+//     into ~/.ssh, ~/.aws, /etc, /dev, etc. is rejected POST-resolution,
+//     so symlink-based escape is closed.
+//     c. The file is os.Lstat'd to assert it is a regular file (no fifo /
+//     device / directory).
+//     d. Read is capped at maxSecretFileSize bytes — even if Stat lied,
+//     io.LimitReader prevents unbounded consumption.
+//     e. Content must not contain a NUL byte.
+//     f. World/group-readable files trigger a loud warning (the user has
+//     stored a credential carelessly), but do not block.
+//     g. Exactly one trailing newline (\n or \r\n) is trimmed — files
+//     created with `echo "tok" > f` have one. Internal newlines (PEM
+//     keys, multi-line tokens) are preserved.
+//     h. Empty resolved values are rejected (almost always a misconfig).
 //  4. Resolved secret values are never logged. Only the key is logged.
 func ResolveCustomEnvs(raw map[string]string) ([]string, error) {
 	if len(raw) == 0 {

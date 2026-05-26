@@ -87,7 +87,8 @@ Most projects need zero configuration. When you do need to customize:
   "envs": {
     "API_BASE": "https://api.example.com",
     "API_TOKEN": "mkenv_value_from:~/secrets/api-token"
-  }
+  },
+  "mount_gpg": true
 }
 ```
 

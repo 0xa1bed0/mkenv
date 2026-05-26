@@ -28,6 +28,7 @@ type EnvConfig interface {
 	Volumes() []string
 	ExtraPkgs() []string
 	Envs() map[string]string // raw env-var spec (may contain "mkenv_value_from:..." directives); resolve via ResolveCustomEnvs
+	MountGPG() bool          // mount host GPG agent sockets into the container
 
 	FilePath() string           // path to .mkenv file that correspond to this env config
 	Signature() (string, error) // return signature of the object
@@ -44,6 +45,7 @@ type envConfig struct {
 	Volumes_                  []string                                   `json:"volumes"`
 	ExtraPkgs_                []string                                   `json:"extra_pkgs"`
 	Envs_                     map[string]string                          `json:"envs"`
+	MountGPG_                 bool                                       `json:"mount_gpg"`
 }
 
 func (ec envConfig) Copy() *envConfig {
@@ -73,6 +75,7 @@ func (ec envConfig) Copy() *envConfig {
 	for k, v := range ec.Envs_ {
 		newEncConfig.Envs_[k] = v
 	}
+	newEncConfig.MountGPG_ = ec.MountGPG_
 	return newEncConfig
 }
 
@@ -163,6 +166,12 @@ func WithEnvs(envs map[string]string) envConfigOption {
 	}
 }
 
+func WithMountGPG(mount bool) envConfigOption {
+	return func(rc *envConfig) {
+		rc.MountGPG_ = mount
+	}
+}
+
 func BuildEnvConfig(opts ...envConfigOption) EnvConfig {
 	cfg := buildDefaultEnvConfig()
 	cfg.name = "built-inmemmory"
@@ -186,6 +195,7 @@ func buildDefaultEnvConfig() *envConfig {
 		Volumes_:                  []string{},
 		ExtraPkgs_:                []string{},
 		Envs_:                     map[string]string{},
+		MountGPG_:                 false,
 	}
 }
 
@@ -257,6 +267,11 @@ func (ec *envConfig) Merge(src EnvConfig) {
 		// resolution elsewhere, a literal secret — never log it.
 		logs.Debugf("Custom env %s defined by %s", k, src.FilePath())
 	}
+
+	if src.MountGPG() {
+		ec.MountGPG_ = true
+		logs.Debugf("GPG agent mount enabled by %s", src.FilePath())
+	}
 }
 
 func (ec *envConfig) FilePath() string {
@@ -312,6 +327,10 @@ func (ec *envConfig) Envs() map[string]string {
 	out := make(map[string]string, len(ec.Envs_))
 	maps.Copy(out, ec.Envs_)
 	return out
+}
+
+func (ec *envConfig) MountGPG() bool {
+	return ec.MountGPG_
 }
 
 func ensureProjectPathIsSafe(ctx context.Context, policy guardrails.Policy, project *Project) error {
@@ -529,6 +548,10 @@ func (p *Project) resolveEnvConfig(ctx context.Context) error {
 
 	if p.envConfigOverride != nil {
 		envCfg.Merge(p.envConfigOverride)
+	}
+
+	if envCfg.MountGPG_ {
+		envCfg.EnableBricks_ = bricksengine.UniqueSortedBricks(append(envCfg.EnableBricks_, "gpg-agent"))
 	}
 
 	err = applyPolicy(envCfg, policy)

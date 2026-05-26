@@ -27,8 +27,8 @@ func TestResolveCustomEnvs_Empty(t *testing.T) {
 
 func TestResolveCustomEnvs_LiteralValues(t *testing.T) {
 	got, err := ResolveCustomEnvs(map[string]string{
-		"FOO":     "bar",
-		"BAZ":     "qux",
+		"FOO":      "bar",
+		"BAZ":      "qux",
 		"EMPTY_OK": "",
 	})
 	if err != nil {

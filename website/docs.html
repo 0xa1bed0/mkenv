@@ -166,6 +166,11 @@ sudo mv mkenv /usr/local/bin/</code></pre>
                     <td>object (string&nbsp;→&nbsp;string)</td>
                     <td>Environment variables to set in the container. Literal values are passed through; values prefixed with <code>mkenv_value_from:&lt;path&gt;</code> are read from a host file at container start (secrets never enter the image). See the example above for the security model.</td>
                 </tr>
+                <tr>
+                    <td><code>mount_gpg</code></td>
+                    <td>boolean</td>
+                    <td>Forward host GPG agent into the container — equivalent to passing <code>--mount-gpg</code> on the command line. Auto-enables the <code>gpg-agent</code> brick. See <a href="#gpg-forwarding">GPG Agent Forwarding</a>.</td>
+                </tr>
             </tbody>
         </table>
 
@@ -213,6 +218,10 @@ claude</code></pre>
 
         <h3>Usage</h3>
         <pre><code>mkenv . --mount-gpg</code></pre>
+        <p>Or set it permanently in your project's <code>.mkenv</code> file:</p>
+        <pre><code>{
+  "mount_gpg": true
+}</code></pre>
 
         <h3>How It Works</h3>
         <p>mkenv does three things when you pass <code>--mount-gpg</code>:</p>
