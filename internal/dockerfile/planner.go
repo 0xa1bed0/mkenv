@@ -211,6 +211,11 @@ func (p *planner) buildPlan(ctx context.Context) (*BuildPlan, error) {
 
 	plan.addExtraPackages(ctx, p.project)
 
+	// Always inject the run-time provisioning guard into ~/.mkenvrc. The block is a
+	// constant (so it never changes the image cache key); the actual commands ride
+	// in at run time via the MKENV_SETUP_B64 env var built from .mkenv "setup".
+	plan.fileTemplates = append(plan.fileTemplates, provisionGuardTemplate())
+
 	plan.packages = uniquePackages(plan.packages)
 	plan.rootRun = uniqueCommands(plan.rootRun)
 	plan.userRun = uniqueCommands(plan.userRun)
@@ -400,6 +405,27 @@ func (p *planner) estimateBricks(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// provisionGuardTemplate returns the constant ~/.mkenvrc snippet that runs the
+// user's .mkenv "setup" commands exactly once per container start.
+//
+// The commands themselves are NOT baked here — they arrive at run time, base64
+// encoded, in the MKENV_SETUP_B64 env var (built in internal/dockercontainer;
+// keep the name in sync). The snippet is constant so it never perturbs the image
+// cache key. The mkdir acts as an atomic, container-local "already ran" marker:
+// /tmp is fresh for each container and shared across all shells/tmux panes, so the
+// first shell to source ~/.mkenvrc provisions and every later shell skips it.
+func provisionGuardTemplate() bricksengine.FileTemplate {
+	const content = `# mkenv: run .mkenv "setup" commands once per container start
+if [ -n "$MKENV_SETUP_B64" ] && mkdir /tmp/.mkenv-provisioned.lock 2>/dev/null; then
+  eval "$(printf %s "$MKENV_SETUP_B64" | base64 -d)"
+fi`
+	return bricksengine.FileTemplate{
+		ID:       "mkenv/provision",
+		FilePath: "rc",
+		Content:  content,
+	}
 }
 
 func mentionsAny(id bricksengine.BrickID, en, dis map[bricksengine.BrickID]bool) bool {

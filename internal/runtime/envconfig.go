@@ -29,6 +29,7 @@ type EnvConfig interface {
 	ExtraPkgs() []string
 	Envs() map[string]string // raw env-var spec (may contain "mkenv_value_from:..." directives); resolve via ResolveCustomEnvs
 	MountGPG() bool          // mount host GPG agent sockets into the container
+	Setup() []string         // shell commands run inside the container once per container start (run-time, not baked into image)
 
 	FilePath() string           // path to .mkenv file that correspond to this env config
 	Signature() (string, error) // return signature of the object
@@ -46,6 +47,7 @@ type envConfig struct {
 	ExtraPkgs_                []string                                   `json:"extra_pkgs"`
 	Envs_                     map[string]string                          `json:"envs"`
 	MountGPG_                 bool                                       `json:"mount_gpg"`
+	Setup_                    []string                                   `json:"setup"`
 }
 
 func (ec envConfig) Copy() *envConfig {
@@ -76,6 +78,7 @@ func (ec envConfig) Copy() *envConfig {
 		newEncConfig.Envs_[k] = v
 	}
 	newEncConfig.MountGPG_ = ec.MountGPG_
+	newEncConfig.Setup_ = append([]string{}, ec.Setup_...)
 	return newEncConfig
 }
 
@@ -90,6 +93,10 @@ func (ec *envConfig) Signature() (string, error) {
 	// Envs are applied at container-run time (not baked into image), and may contain
 	// secret-from-file directives whose resolved value must never enter the cache key.
 	ecCopy.Envs_ = map[string]string{}
+	// Setup commands are delivered to the container at run time (via env var) and run
+	// against a runtime-mounted folder, so they never affect the image and must not
+	// enter the cache key — otherwise editing setup would needlessly force a rebuild.
+	ecCopy.Setup_ = []string{}
 
 	data, err := json.Marshal(ecCopy)
 	if err != nil {
@@ -172,6 +179,15 @@ func WithMountGPG(mount bool) envConfigOption {
 	}
 }
 
+func WithSetup(setup []string) envConfigOption {
+	return func(rc *envConfig) {
+		if setup == nil {
+			return
+		}
+		rc.Setup_ = append([]string{}, setup...)
+	}
+}
+
 func BuildEnvConfig(opts ...envConfigOption) EnvConfig {
 	cfg := buildDefaultEnvConfig()
 	cfg.name = "built-inmemmory"
@@ -196,6 +212,7 @@ func buildDefaultEnvConfig() *envConfig {
 		ExtraPkgs_:                []string{},
 		Envs_:                     map[string]string{},
 		MountGPG_:                 false,
+		Setup_:                    []string{},
 	}
 }
 
@@ -272,6 +289,13 @@ func (ec *envConfig) Merge(src EnvConfig) {
 		ec.MountGPG_ = true
 		logs.Debugf("GPG agent mount enabled by %s", src.FilePath())
 	}
+
+	ec.Setup_ = append(ec.Setup_, src.Setup()...)
+	for range src.Setup() {
+		// Log only the count/source. The command text is shown to the user in the
+		// explicit run-time approval prompt, not buried in debug logs.
+		logs.Debugf("Setup command defined by %s", src.FilePath())
+	}
 }
 
 func (ec *envConfig) FilePath() string {
@@ -331,6 +355,12 @@ func (ec *envConfig) Envs() map[string]string {
 
 func (ec *envConfig) MountGPG() bool {
 	return ec.MountGPG_
+}
+
+func (ec *envConfig) Setup() []string {
+	out := []string{}
+	out = append(out, ec.Setup_...)
+	return out
 }
 
 func ensureProjectPathIsSafe(ctx context.Context, policy guardrails.Policy, project *Project) error {

@@ -88,13 +88,18 @@ Most projects need zero configuration. When you do need to customize:
     "API_BASE": "https://api.example.com",
     "API_TOKEN": "mkenv_value_from:~/secrets/api-token"
   },
-  "mount_gpg": true
+  "mount_gpg": true,
+  "setup": ["~/dotconfigs/install.sh"]
 }
 ```
 
 Bricks are atomic building blocks — things like `claude-code`, `nvim`, `node`, `go`.
 
 Use `envs` to inject environment variables into the container. Plain string values are passed through as-is. Values starting with `mkenv_value_from:<path>` are read from the named host file at container start — the contents never enter the docker image, and resolved values are never logged. Paths must be absolute or `~/`-prefixed; reads are sandboxed by the same guardrails that block credential mounts (`~/.ssh`, `~/.aws`, `/etc`, etc.).
+
+Use `setup` to run your own commands inside the sandbox **once per container start** — for example, to install dotfiles from a folder you mounted via `volumes`. Each entry is a shell command, run in order, in the container's shell environment (so `~` is the container's home and paths can rely on anything in `volumes`). The commands run during shell init, before you reach a prompt, and a per-container marker ensures they don't re-run for additional shells or tmux panes. They are *not* baked into the image, so editing `setup` never forces a rebuild.
+
+Because `setup` runs arbitrary commands, mkenv shows you exactly what will be mounted and what will run and requires explicit approval **every** time the sandbox starts. This means a `.mkenv` that declares `setup` can't be used non-interactively (e.g. `mkenv . -c ...` from CI with no terminal) — mkenv refuses rather than running unapproved scripts.
 
 For security policies enforcement, see [policy documentation](https://mkenv.sh/docs.html#policies).
 

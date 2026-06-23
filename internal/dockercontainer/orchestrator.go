@@ -3,6 +3,7 @@ package dockercontainer
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -198,6 +199,9 @@ func (co *ContainerOrchestrator) startCommandEnv() {
 	if tz := hostTimezone(); tz != "" {
 		envs = append(envs, "TZ="+tz)
 	}
+	if setupEnv, ok := setupScriptEnv(co.rt.Project().EnvConfig(ctx)); ok {
+		envs = append(envs, setupEnv)
+	}
 
 	customEnvs, err := runtime.ResolveCustomEnvs(co.rt.Project().EnvConfig(ctx).Envs())
 	if err != nil {
@@ -249,6 +253,9 @@ func (co *ContainerOrchestrator) getEnvVars(ctx context.Context) ([]string, erro
 	if tz := hostTimezone(); tz != "" {
 		envs = append(envs, "TZ="+tz)
 	}
+	if setupEnv, ok := setupScriptEnv(co.rt.Project().EnvConfig(ctx)); ok {
+		envs = append(envs, setupEnv)
+	}
 
 	customEnvs, err := runtime.ResolveCustomEnvs(co.rt.Project().EnvConfig(ctx).Envs())
 	if err != nil {
@@ -285,6 +292,27 @@ func rejectCustomEnvCollisions(mkenvEnvs, customEnvs []string) error {
 		}
 	}
 	return nil
+}
+
+// setupScriptEnvVar is the env var carrying the base64-encoded .mkenv "setup"
+// script into the container. A constant guard block baked into ~/.mkenvrc decodes
+// and runs it once per container start (see internal/dockerfile/dockerfile.go).
+// It is base64-encoded so multi-line scripts survive transport without quoting or
+// newline issues, and it is treated as an mkenv-managed env so a user-defined env
+// of the same name is rejected as a collision rather than silently overriding it.
+const setupScriptEnvVar = "MKENV_SETUP_B64"
+
+// setupScriptEnv builds the "MKENV_SETUP_B64=<base64>" container env from the
+// .mkenv "setup" commands. The second return value is false when there is nothing
+// to run, in which case no env var is set and the guard block is a no-op.
+func setupScriptEnv(ec runtime.EnvConfig) (string, bool) {
+	cmds := ec.Setup()
+	if len(cmds) == 0 {
+		return "", false
+	}
+	script := strings.Join(cmds, "\n")
+	enc := base64.StdEncoding.EncodeToString([]byte(script))
+	return setupScriptEnvVar + "=" + enc, true
 }
 
 // hostTimezone returns the IANA timezone name of the host (e.g. "Europe/Kyiv").

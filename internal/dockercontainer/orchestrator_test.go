@@ -1,8 +1,11 @@
 package dockercontainer
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
+
+	"github.com/0xa1bed0/mkenv/internal/runtime"
 )
 
 func TestRejectCustomEnvCollisions(t *testing.T) {
@@ -68,4 +71,31 @@ func TestRejectCustomEnvCollisions(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+}
+
+func TestSetupScriptEnv(t *testing.T) {
+	// No setup commands -> no env var.
+	if _, ok := setupScriptEnv(runtime.BuildEnvConfig()); ok {
+		t.Error("expected no setup env var when setup is empty")
+	}
+
+	ec := runtime.BuildEnvConfig(runtime.WithSetup([]string{"~/dotconfigs/install.sh", "echo done"}))
+	got, ok := setupScriptEnv(ec)
+	if !ok {
+		t.Fatal("expected a setup env var when setup is non-empty")
+	}
+
+	name, value, found := strings.Cut(got, "=")
+	if !found || name != setupScriptEnvVar {
+		t.Fatalf("expected %s=<...>, got %q", setupScriptEnvVar, got)
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		t.Fatalf("value is not valid base64: %v", err)
+	}
+	want := "~/dotconfigs/install.sh\necho done"
+	if string(decoded) != want {
+		t.Errorf("decoded script = %q, want %q", string(decoded), want)
+	}
 }

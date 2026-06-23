@@ -2,6 +2,7 @@ package runcmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/moby/term"
 
 	"github.com/0xa1bed0/mkenv/internal/agentdist"
 	hostappconfig "github.com/0xa1bed0/mkenv/internal/apps/mkenv/config"
@@ -162,6 +165,12 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 		)
 	}
 
+	// Require explicit approval of any .mkenv "setup" commands before we build or
+	// start the container, so the user always sees what will be mounted and run.
+	if err := confirmSetupApproval(signalsCtx, project); err != nil {
+		return err
+	}
+
 	dockerImageResolver, err := dockerimage.DefaultDockerImageResolver(signalsCtx)
 	if err != nil {
 		return err
@@ -195,6 +204,61 @@ func RunCmdRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	return containerOrchestrator.Start()
+}
+
+// confirmSetupApproval shows the user exactly which host folders will be mounted
+// and which commands will run inside the sandbox, then requires explicit y/N
+// approval before the container is built and started. It is a no-op when the
+// resolved .mkenv config declares no "setup" commands.
+//
+// Approval is required on every container start. Because it is interactive, a
+// .mkenv that declares setup commands cannot be used without a terminal (e.g.
+// `mkenv . -c ...` from CI): we fail with a clear message rather than silently
+// skipping the scripts.
+func confirmSetupApproval(ctx context.Context, project *runtime.Project) error {
+	ec := project.EnvConfig(ctx)
+	setup := ec.Setup()
+	if len(setup) == 0 {
+		return nil
+	}
+
+	volumes := ec.Volumes()
+
+	var b strings.Builder
+	b.WriteString("mkenv will mount these folders and run setup commands inside the sandbox:\n\n")
+	for _, v := range volumes {
+		host, container, found := strings.Cut(v, ":")
+		if !found {
+			fmt.Fprintf(&b, "  MOUNT  %s\n", v)
+			continue
+		}
+		// Drop any trailing mount options (e.g. ":ro") from the displayed target.
+		if target, _, ok := strings.Cut(container, ":"); ok {
+			container = target
+		}
+		fmt.Fprintf(&b, "  MOUNT  %s  →  %s\n", host, container)
+	}
+	if len(volumes) > 0 {
+		b.WriteString("\n")
+	}
+	for _, cmd := range setup {
+		fmt.Fprintf(&b, "  RUN    %s\n", cmd)
+	}
+	b.WriteString("\nThese run once when the sandbox starts. Allow?")
+
+	if _, isTerm := term.GetFdInfo(os.Stdin); !isTerm {
+		return fmt.Errorf("the .mkenv \"setup\" commands require interactive approval, but stdin is not a terminal.\n"+
+			"Run mkenv in an interactive terminal to review and approve them:\n\n%s", b.String())
+	}
+
+	ok, err := logs.PromptConfirm(b.String())
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("setup commands were not approved; aborting")
+	}
+	return nil
 }
 
 func mkbinds(ctx context.Context, rt *runtime.Runtime, project *runtime.Project, addDockerSocket bool, mountGPG bool) ([]string, []string, string, string, error) {
